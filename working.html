@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SOLK Shoe</title>
+    <style>
+        body { margin: 0; background: black; overflow-x: hidden; }
+        #container { position: fixed; width: 100vw; height: 100vh; }
+        #info { position: absolute; top: 20px; left: 20px; color: white; z-index: 100; }
+        #content { height: 300vh; }
+        #debug { position: absolute; top: 100px; left: 20px; color: red; z-index: 100; font-size: 20px; }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="info">
+        <h2>SOLK Shoe Wireframe</h2>
+        <p>Scroll to rotate • Drag to orbit</p>
+    </div>
+    <div id="debug">LOADING...</div>
+    <div id="content"></div>
+
+    <script src="three.min.js"></script>
+    <script src="GLTFLoader.js"></script>
+    <script src="OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/examples/js/loaders/DRACOLoader.js"></script>
+    <script>
+        var scene, camera, renderer, model, controls, scrollY = 0;
+        
+        document.getElementById('debug').innerHTML = 'Starting Three.js...';
+        
+        if (typeof THREE === 'undefined') {
+            document.getElementById('debug').innerHTML = 'THREE.js NOT LOADED!';
+        } else {
+            document.getElementById('debug').innerHTML = 'THREE.js loaded, setting up scene...';
+        }
+        
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000000);
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 0, 10);
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('container').appendChild(renderer.domElement);
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        
+        var light = new THREE.AmbientLight(0xffffff, 1);
+        scene.add(light);
+        
+        document.getElementById('debug').innerHTML = 'Scene setup complete, loading model...';
+        
+        function loadNewShoe() {
+            var loader = new THREE.GLTFLoader();
+            document.getElementById('debug').innerHTML = 'Loading new shoe without DRACO...';
+            
+            loader.load('shoe-nodraco.glb', 
+            function(gltf) {
+                document.getElementById('debug').innerHTML = 'GLB LOADED! Processing...';
+                model = gltf.scene;
+                
+                var meshCount = 0;
+                model.traverse(function(child) {
+                    if (child.isMesh) {
+                        meshCount++;
+                        child.material = new THREE.MeshBasicMaterial({ 
+                            color: 0x00ff00, 
+                            wireframe: true,
+                            side: THREE.DoubleSide
+                        });
+                    }
+                });
+                
+                document.getElementById('debug').innerHTML = 'Found ' + meshCount + ' meshes, scaling...';
+                
+                var box = new THREE.Box3().setFromObject(model);
+                var center = box.getCenter(new THREE.Vector3());
+                var size = box.getSize(new THREE.Vector3());
+                
+                document.getElementById('debug').innerHTML = 'Size: ' + size.x.toFixed(2) + ',' + size.y.toFixed(2) + ',' + size.z.toFixed(2);
+                
+                if (size.x === 0 && size.y === 0 && size.z === 0) {
+                    document.getElementById('debug').innerHTML = 'No geometry found - using cube';
+                    var cube = new THREE.Mesh(new THREE.BoxGeometry(2,2,2), new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true }));
+                    scene.add(cube);
+                    model = cube;
+                    return;
+                }
+                
+                var maxSize = Math.max(size.x, size.y, size.z);
+                var scale = 50 / maxSize;
+                model.position.set(0, 0, 0);
+                model.scale.setScalar(scale);
+                scene.add(model);
+                
+                document.getElementById('debug').innerHTML = 'NEW SHOE LOADED! Perfect pivot point.';
+            },
+            function(progress) {
+                console.log('Loading:', (progress.loaded/progress.total*100) + '%');
+            },
+            function(error) {
+                document.getElementById('debug').innerHTML = 'New shoe failed: ' + error.message + ', trying old shoe...';
+                console.error('Loading error:', error);
+                
+                // Fallback to original shoe
+                loader.load('shoe.glb', 
+                    function(gltf) {
+                        document.getElementById('debug').innerHTML = 'OLD SHOE LOADED! Processing...';
+                        model = gltf.scene;
+                        
+                        var meshCount = 0;
+                        model.traverse(function(child) {
+                            if (child.isMesh) {
+                                meshCount++;
+                                child.material = new THREE.MeshBasicMaterial({ 
+                                    color: 0x00ff00, 
+                                    wireframe: true,
+                                    side: THREE.DoubleSide
+                                });
+                            }
+                        });
+                        
+                        var box = new THREE.Box3().setFromObject(model);
+                        var center = box.getCenter(new THREE.Vector3());
+                        var size = box.getSize(new THREE.Vector3());
+                        var maxSize = Math.max(size.x, size.y, size.z);
+                        var scale = 50 / maxSize;
+                        model.position.sub(center);
+                        model.position.set(0, 0, 0);
+                        model.scale.setScalar(scale);
+                        scene.add(model);
+                        
+                        document.getElementById('debug').innerHTML = 'OLD SHOE LOADED! (New shoe needs DRACO decoder)';
+                    },
+                    undefined,
+                    function(error2) {
+                        document.getElementById('debug').innerHTML = 'Both shoes failed - using cube';
+                        var cube = new THREE.Mesh(new THREE.BoxGeometry(2,2,2), new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true }));
+                        scene.add(cube);
+                        model = cube;
+                    }
+                );
+        }
+        
+        // Start loading immediately
+        loadNewShoe();
+        
+        window.addEventListener('scroll', function() { scrollY = window.pageYOffset; });
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            if (model) {
+                var rot = scrollY * 0.005;
+                model.rotation.y = rot;
+                model.rotation.x = rot * 0.3;
+            }
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>

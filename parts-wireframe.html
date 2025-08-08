@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Parts Wireframe</title>
+    <style>
+        body { margin: 0; background: black; overflow-x: hidden; }
+        #container { position: fixed; width: 100vw; height: 100vh; }
+        #info { position: absolute; top: 20px; left: 20px; color: white; z-index: 100; }
+        #content { height: 300vh; }
+        #debug { position: absolute; top: 100px; left: 20px; color: red; z-index: 100; font-size: 20px; }
+        #controls { position: absolute; top: 150px; left: 20px; color: white; z-index: 100; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="info">
+        <h2>All Parts Wireframe</h2>
+        <p>Shows all mesh part boundaries</p>
+    </div>
+    <div id="debug">Starting...</div>
+    <div id="controls">
+        <h3>Settings</h3>
+        <label>Part Count: <span id="partCount">0</span></label><br><br>
+        <label>Edge Threshold: <span id="thresholdValue">45</span>°</label><br>
+        <input type="range" id="edgeThreshold" min="5" max="90" step="5" value="45"><br><br>
+        <label>Scale: <span id="scaleValue">6</span></label><br>
+        <input type="range" id="scaleSlider" min="2" max="15" step="1" value="6"><br><br>
+        <button onclick="updateEdges()">Update Edges</button>
+    </div>
+    <div id="content"></div>
+
+    <script src="three.min.js"></script>
+    <script src="GLTFLoader.js"></script>
+    <script src="OrbitControls.js"></script>
+    <script>
+        var scene, camera, renderer, model, controls, scrollY = 0;
+        var raycaster, mouse = new THREE.Vector2();
+        var modelChildren = [];
+        var hoveredMesh = null;
+        
+        document.getElementById('debug').innerHTML = 'Setting up Three.js...';
+        
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000000);
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 0, 10);
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('container').appendChild(renderer.domElement);
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        
+        var light = new THREE.AmbientLight(0xffffff, 1);
+        scene.add(light);
+        
+        raycaster = new THREE.Raycaster();
+        
+        // Create clean edge lines instead of wireframe
+        function createPartEdgesMaterial(color) {
+            return new THREE.LineBasicMaterial({
+                color: color,
+                linewidth: 1
+            });
+        }
+        
+        // Create edge geometry for each mesh part
+        function createEdgesForMesh(mesh) {
+            var edges = new THREE.EdgesGeometry(mesh.geometry, 30); // 30 degree threshold
+            var edgeMaterial = new THREE.LineBasicMaterial({ 
+                color: 0x888888,
+                linewidth: 1
+            });
+            var edgeLines = new THREE.LineSegments(edges, edgeMaterial);
+            
+            // Copy transform from original mesh
+            edgeLines.position.copy(mesh.position);
+            edgeLines.rotation.copy(mesh.rotation);
+            edgeLines.scale.copy(mesh.scale);
+            edgeLines.userData.originalMesh = mesh;
+            
+            return edgeLines;
+        }
+        
+        var edgeLines = [];
+        
+        function showAllParts() {
+            var threshold = parseFloat(document.getElementById('edgeThreshold').value);
+            
+            // Clear existing edge lines
+            edgeLines.forEach(function(line) {
+                scene.remove(line);
+            });
+            edgeLines = [];
+            
+            // Hide original meshes
+            modelChildren.forEach(function(mesh) {
+                mesh.visible = false;
+            });
+            
+            // Create clean edge lines for each part
+            modelChildren.forEach(function(mesh, index) {
+                var edges = new THREE.EdgesGeometry(mesh.geometry, threshold);
+                var material = createPartEdgesMaterial(0xffffff);
+                var edgeLine = new THREE.LineSegments(edges, material);
+                
+                // Apply same transform as original mesh
+                edgeLine.position.copy(mesh.position);
+                edgeLine.rotation.copy(mesh.rotation);
+                edgeLine.scale.copy(mesh.scale);
+                edgeLine.userData.meshIndex = index;
+                
+                scene.add(edgeLine);
+                edgeLines.push(edgeLine);
+            });
+            
+            document.getElementById('debug').innerHTML = 'Showing clean edges for ' + modelChildren.length + ' parts';
+        }
+        
+        window.updateEdges = function() {
+            var threshold = parseFloat(document.getElementById('edgeThreshold').value);
+            var scale = parseFloat(document.getElementById('scaleSlider').value);
+            
+            document.getElementById('thresholdValue').textContent = threshold;
+            document.getElementById('scaleValue').textContent = scale;
+            
+            // Update model scale
+            var box = new THREE.Box3().setFromObject(model);
+            var size = box.getSize(new THREE.Vector3());
+            var maxSize = Math.max(size.x, size.y, size.z);
+            var newScale = scale / maxSize;
+            model.scale.setScalar(newScale);
+            
+            // Recreate edges with new threshold
+            showAllParts();
+        };
+        
+        // Setup sliders
+        document.getElementById('edgeThreshold').addEventListener('input', function() {
+            document.getElementById('thresholdValue').textContent = this.value;
+        });
+        
+        document.getElementById('scaleSlider').addEventListener('input', function() {
+            document.getElementById('scaleValue').textContent = this.value;
+        });
+        
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(edgeLines);
+            
+            // Reset all edge lines to white
+            edgeLines.forEach(function(line) {
+                line.material.color.setHex(0xffffff);
+            });
+            
+            if (intersects.length > 0) {
+                var hoveredLine = intersects[0].object;
+                hoveredLine.material.color.setHex(0xff0000); // Red highlight
+                
+                document.getElementById('debug').innerHTML = 'Hovering: Part ' + hoveredLine.userData.meshIndex;
+            } else {
+                document.getElementById('debug').innerHTML = 'Clean edge wireframe - click "Show All Parts"';
+            }
+        }
+        
+        document.getElementById('debug').innerHTML = 'Loading shoe...';
+        
+        var loader = new THREE.GLTFLoader();
+        loader.load('shoe-nodraco.glb', 
+            function(gltf) {
+                document.getElementById('debug').innerHTML = 'SHOE LOADED! Processing parts...';
+                model = gltf.scene;
+                
+                // Clear any existing children
+                modelChildren = [];
+                
+                model.traverse(function(child) {
+                    if (child.isMesh) {
+                        modelChildren.push(child);
+                        child.visible = false; // Hide original mesh initially
+                        
+                        console.log('Found mesh part:', child.name || 'unnamed', 'vertices:', child.geometry.attributes.position.count);
+                    }
+                });
+                
+                // Automatically show clean edges
+                setTimeout(showAllParts, 100);
+                
+                document.getElementById('partCount').textContent = modelChildren.length;
+                
+                var box = new THREE.Box3().setFromObject(model);
+                var center = box.getCenter(new THREE.Vector3());
+                var size = box.getSize(new THREE.Vector3());
+                var maxSize = Math.max(size.x, size.y, size.z);
+                var scale = 6 / maxSize; // Much bigger scale
+                
+                // Center and scale the model
+                model.position.sub(center.multiplyScalar(scale));
+                model.scale.setScalar(scale);
+                scene.add(model);
+                
+                // Move camera closer
+                camera.position.set(0, 0, 5);
+                
+                window.addEventListener('mousemove', onMouseMove);
+                
+                document.getElementById('debug').innerHTML = 'Found ' + modelChildren.length + ' mesh parts. All wireframes should be visible!';
+            },
+            function(progress) {
+                console.log('Loading:', (progress.loaded/progress.total*100) + '%');
+            },
+            function(error) {
+                document.getElementById('debug').innerHTML = 'FAILED: ' + error.message;
+                console.error('Error:', error);
+            }
+        );
+        
+        window.addEventListener('scroll', function() { scrollY = window.pageYOffset; });
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            if (model) {
+                var rot = scrollY * 0.005;
+                model.rotation.y = rot;
+                model.rotation.x = rot * 0.3;
+            }
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>

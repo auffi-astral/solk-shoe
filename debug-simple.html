@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Simple</title>
+    <style>
+        body { margin: 0; background: black; overflow-x: hidden; }
+        #container { position: fixed; width: 100vw; height: 100vh; }
+        #info { position: absolute; top: 20px; left: 20px; color: white; z-index: 100; }
+        #debug { position: absolute; top: 100px; left: 20px; color: red; z-index: 100; font-size: 20px; }
+        #logo { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="logo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 111.7 42.9" style="height: 80px;">
+          <defs>
+            <style>
+              .st0 {
+                fill: #fff;
+              }
+            </style>
+          </defs>
+          <g id="SOLK">
+            <g id="s">
+              <path class="st0" d="M7.9,23.2h2.4c.3,2.1,2.2,2.9,5.7,2.9s5-1.2,5-2.6-.8-1.9-5.7-2.1c-5.3-.2-7.1-1.1-7.1-3.6s2.2-4.3,7.4-4.3,7.3,1.4,7.5,4.1h-2.2c-.2-1.5-1.8-2.4-5.5-2.4s-4.8,1-4.8,2.5,1.1,1.9,5.9,2.1c5.5.2,6.9,1.1,6.9,3.6s-2.2,4.6-7.4,4.6-7.6-1.3-8-4.6"/>
+            </g>
+            <g id="o">
+              <path class="st0" d="M33.6,20.6c0-4.5,3.3-7.2,9.1-7.2s9,2.7,9,7.2-3.3,7.2-9,7.2-9.1-2.7-9.1-7.2M49.3,20.6c0-3.6-2.6-5.4-6.6-5.4s-6.7,1.8-6.7,5.4,2.6,5.4,6.7,5.4,6.6-1.8,6.6-5.4"/>
+            </g>
+            <g id="l">
+              <polygon class="st0" points="65.6 25.7 76.7 25.7 76.7 27.6 63.3 27.6 63.3 13.6 65.6 13.6 65.6 25.7"/>
+            </g>
+            <g id="k">
+              <polygon class="st0" points="103.7 13.6 103.7 13.7 94.7 20.1 103.7 27.6 103.7 27.6 100.7 27.6 93.1 21.3 90.6 23.1 90.6 27.6 88.2 27.6 88.2 13.6 90.6 13.6 90.6 20.9 100.6 13.6 103.7 13.6"/>
+            </g>
+          </g>
+        </svg>
+    </div>
+    <div id="info">
+        <h2>Debug Version</h2>
+        <p>Testing render targets</p>
+    </div>
+    <div id="debug">Starting...</div>
+    <div id="content" style="height: 300vh;"></div>
+
+    <script src="three.min.js"></script>
+    <script src="GLTFLoader.js"></script>
+    <script src="OrbitControls.js"></script>
+    <script>
+        var scene, camera, renderer, model, controls, scrollY = 0;
+        var renderTargetA, renderTargetB, testMaterial;
+        var modelChildren = [];
+        var raycaster, mouse = new THREE.Vector2();
+        var selectedMeshName = null;
+        var meshUuidToName = {};
+        
+        document.getElementById('debug').innerHTML = 'Setting up Three.js...';
+        
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000000);
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 2, 8);
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('container').appendChild(renderer.domElement);
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableZoom = false;
+        
+        var light = new THREE.AmbientLight(0xffffff, 1);
+        scene.add(light);
+        
+        raycaster = new THREE.Raycaster();
+        
+        // Create dual render targets
+        renderTargetA = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+        renderTargetB = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+        
+        // Dual render target edge detection shader
+        testMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                tDiffuse1: { value: null }, // All parts
+                tDiffuse2: { value: null }, // Hovered part only
+                resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse1; // All parts with edge detection
+                uniform sampler2D tDiffuse2; // Hovered part as full wireframe
+                uniform vec2 resolution;
+                varying vec2 vUv;
+                
+                float detectEdges(sampler2D tex, vec2 texel) {
+                    float center = texture2D(tex, vUv).r;
+                    float left = texture2D(tex, vUv - vec2(texel.x, 0.0)).r;
+                    float right = texture2D(tex, vUv + vec2(texel.x, 0.0)).r;
+                    float up = texture2D(tex, vUv - vec2(0.0, texel.y)).r;
+                    float down = texture2D(tex, vUv + vec2(0.0, texel.y)).r;
+                    
+                    float edge = abs(center - left) + abs(center - right) + 
+                                abs(center - up) + abs(center - down);
+                    
+                    return edge > 0.05 ? 1.0 : 0.0;
+                }
+                
+                void main() {
+                    vec2 texel = vec2(1.0 / resolution.x, 1.0 / resolution.y);
+                    
+                    // Detect edges from all parts (white)
+                    float baseEdges = detectEdges(tDiffuse1, texel);
+                    
+                    // Check if hovered part has wireframe content
+                    vec4 hoveredWireframe = texture2D(tDiffuse2, vUv);
+                    
+                    // Start with white base edges
+                    vec3 finalColor = vec3(baseEdges);
+                    
+                    // If hovered part has wireframe content, show it in red
+                    if (hoveredWireframe.r > 0.1) {
+                        finalColor = vec3(1.0, 0.0, 0.0); // Red wireframe for hovered part
+                    }
+                    
+                    gl_FragColor = vec4(finalColor, 1.0);
+                }
+            `
+        });
+        
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(modelChildren);
+            
+            if (intersects.length > 0) {
+                const targetMesh = intersects[0].object;
+                selectedMeshName = meshUuidToName[targetMesh.uuid] || targetMesh.uuid;
+                document.getElementById('debug').innerHTML = 'Hovering: ' + (targetMesh.name || 'mesh part');
+            } else {
+                selectedMeshName = null;
+                document.getElementById('debug').innerHTML = 'Clean wireframe with red hover highlighting';
+            }
+        }
+        
+        document.getElementById('debug').innerHTML = 'Loading shoe...';
+        
+        var loader = new THREE.GLTFLoader();
+        loader.load('shoe-nodraco.glb', 
+            function(gltf) {
+                document.getElementById('debug').innerHTML = 'SHOE LOADED!';
+                model = gltf.scene;
+                
+                model.traverse(function(child) {
+                    if (child.isMesh) {
+                        modelChildren.push(child);
+                        meshUuidToName[child.uuid] = child.name || child.uuid;
+                        
+                        // Give each mesh part a different gray value so edge detector sees boundaries
+                        var meshIndex = modelChildren.length - 1;
+                        var grayValue = 0.3 + (meshIndex * 0.1) % 0.7; // Different gray values
+                        
+                        child.material = new THREE.MeshBasicMaterial({
+                            color: new THREE.Color(grayValue, grayValue, grayValue)
+                        });
+                    }
+                });
+                
+                // Scale the model
+                var box = new THREE.Box3().setFromObject(model);
+                var center = box.getCenter(new THREE.Vector3());
+                var size = box.getSize(new THREE.Vector3());
+                var maxSize = Math.max(size.x, size.y, size.z);
+                var scale = 8 / maxSize;
+                
+                model.position.copy(center).multiplyScalar(-scale);
+                model.scale.setScalar(scale);
+                scene.add(model);
+                
+                window.addEventListener('mousemove', onMouseMove);
+                document.getElementById('debug').innerHTML = 'Clean wireframe with red hover highlighting';
+            },
+            function(progress) {
+                console.log('Loading:', (progress.loaded/progress.total*100) + '%');
+            },
+            function(error) {
+                document.getElementById('debug').innerHTML = 'FAILED: ' + error.message;
+                console.error('Error:', error);
+            }
+        );
+        
+        var altPressed = false;
+        
+        window.addEventListener('keydown', function(e) {
+            if (e.altKey) altPressed = true;
+        });
+        
+        window.addEventListener('keyup', function(e) {
+            if (!e.altKey) altPressed = false;
+        });
+        
+        window.addEventListener('wheel', function(e) {
+            if (altPressed) {
+                // Allow zoom when alt is pressed
+                controls.enableZoom = true;
+            } else {
+                // Disable zoom and handle scroll rotation
+                controls.enableZoom = false;
+                e.preventDefault();
+                scrollY += e.deltaY * 0.5;
+            }
+        });
+        
+        window.addEventListener('scroll', function() { scrollY = window.pageYOffset; });
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            if (model) {
+                var rot = scrollY * 0.005;
+                model.rotation.y = rot;
+            }
+            controls.update();
+            
+            if (model) {
+                // Render renderTargetA (all parts)
+                modelChildren.forEach(function(mesh) {
+                    mesh.visible = true;
+                });
+                
+                renderer.setRenderTarget(renderTargetA);
+                renderer.render(scene, camera);
+                
+                // Render renderTargetB (only hovered part as full wireframe)
+                if (selectedMeshName) {
+                    modelChildren.forEach(function(mesh) {
+                        if (meshUuidToName[mesh.uuid] === selectedMeshName) {
+                            mesh.visible = true;
+                            // Change to wireframe mode for hovered part
+                            mesh.material.wireframe = true;
+                        } else {
+                            mesh.visible = false;
+                        }
+                    });
+                    
+                    renderer.setRenderTarget(renderTargetB);
+                    renderer.render(scene, camera);
+                    
+                    // Reset wireframe mode
+                    modelChildren.forEach(function(mesh) {
+                        if (meshUuidToName[mesh.uuid] === selectedMeshName) {
+                            mesh.material.wireframe = false;
+                        }
+                    });
+                } else {
+                    // Clear renderTargetB if nothing is hovered
+                    renderer.setRenderTarget(renderTargetB);
+                    renderer.clear();
+                }
+                
+                // Reset visibility
+                modelChildren.forEach(function(mesh) {
+                    mesh.visible = true;
+                });
+                
+                // Apply edge detection with both render targets
+                testMaterial.uniforms.tDiffuse1.value = renderTargetA.texture;
+                testMaterial.uniforms.tDiffuse2.value = renderTargetB.texture;
+                
+                renderer.setRenderTarget(null);
+                
+                // Create fullscreen quad for post-processing
+                var quadGeometry = new THREE.PlaneGeometry(2, 2);
+                var quad = new THREE.Mesh(quadGeometry, testMaterial);
+                var quadScene = new THREE.Scene();
+                quadScene.add(quad);
+                var quadCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+                
+                renderer.render(quadScene, quadCamera);
+            } else {
+                // If no model yet, render normally
+                renderer.render(scene, camera);
+            }
+        }
+        animate();
+    </script>
+</body>
+</html>

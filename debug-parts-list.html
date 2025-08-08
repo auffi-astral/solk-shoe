@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Parts List</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body { 
+            margin: 0; 
+            background: black; 
+            overflow-x: hidden; 
+            font-family: 'Inter', sans-serif;
+        }
+        #container { position: fixed; width: 100vw; height: 100vh; }
+        #info { 
+            position: absolute; 
+            top: 20px; 
+            left: 20px; 
+            color: white; 
+            z-index: 100; 
+            font-family: 'Inter', sans-serif;
+            font-weight: 400;
+        }
+        #debug { 
+            position: absolute; 
+            top: 100px; 
+            left: 20px; 
+            color: red; 
+            z-index: 100; 
+            font-size: 20px; 
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+        }
+        #logo { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; }
+        #partsList {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 200px;
+            max-height: 80vh;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 15px;
+            z-index: 100;
+            font-family: 'Inter', sans-serif;
+        }
+        #partsList h3 {
+            color: white;
+            margin: 0 0 10px 0;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .part-item {
+            color: #ccc;
+            padding: 8px 12px;
+            margin: 2px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 400;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+        .part-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border-color: #555;
+        }
+        .part-item.active {
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff6666;
+            border-color: #ff0000;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="logo">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 111.7 42.9" style="height: 80px;">
+          <defs>
+            <style>
+              .st0 {
+                fill: #fff;
+              }
+            </style>
+          </defs>
+          <g id="SOLK">
+            <g id="s">
+              <path class="st0" d="M7.9,23.2h2.4c.3,2.1,2.2,2.9,5.7,2.9s5-1.2,5-2.6-.8-1.9-5.7-2.1c-5.3-.2-7.1-1.1-7.1-3.6s2.2-4.3,7.4-4.3,7.3,1.4,7.5,4.1h-2.2c-.2-1.5-1.8-2.4-5.5-2.4s-4.8,1-4.8,2.5,1.1,1.9,5.9,2.1c5.5.2,6.9,1.1,6.9,3.6s-2.2,4.6-7.4,4.6-7.6-1.3-8-4.6"/>
+            </g>
+            <g id="o">
+              <path class="st0" d="M33.6,20.6c0-4.5,3.3-7.2,9.1-7.2s9,2.7,9,7.2-3.3,7.2-9,7.2-9.1-2.7-9.1-7.2M49.3,20.6c0-3.6-2.6-5.4-6.6-5.4s-6.7,1.8-6.7,5.4,2.6,5.4,6.7,5.4,6.6-1.8,6.6-5.4"/>
+            </g>
+            <g id="l">
+              <polygon class="st0" points="65.6 25.7 76.7 25.7 76.7 27.6 63.3 27.6 63.3 13.6 65.6 13.6 65.6 25.7"/>
+            </g>
+            <g id="k">
+              <polygon class="st0" points="103.7 13.6 103.7 13.7 94.7 20.1 103.7 27.6 103.7 27.6 100.7 27.6 93.1 21.3 90.6 23.1 90.6 27.6 88.2 27.6 88.2 13.6 90.6 13.6 90.6 20.9 100.6 13.6 103.7 13.6"/>
+            </g>
+          </g>
+        </svg>
+    </div>
+    <div id="info">
+        <h2>Debug Parts List</h2>
+        <p>Simple wireframe test</p>
+    </div>
+    <div id="debug">Starting...</div>
+    <div id="partsList">
+        <h3>Parts</h3>
+        <div id="partsListContent">Loading...</div>
+    </div>
+
+    <script src="three.min.js"></script>
+    <script src="GLTFLoader.js"></script>
+    <script src="OrbitControls.js"></script>
+    <script>
+        var scene, camera, renderer, model, controls;
+        var modelChildren = [];
+        var raycaster, mouse = new THREE.Vector2();
+        var selectedMeshName = null;
+        var meshUuidToName = {};
+        var hoveredFromList = null;
+        
+        document.getElementById('debug').innerHTML = 'Setting up Three.js...';
+        
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000000);
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 2, 8);
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('container').appendChild(renderer.domElement);
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        
+        var light = new THREE.AmbientLight(0xffffff, 1);
+        scene.add(light);
+        
+        raycaster = new THREE.Raycaster();
+        
+        function updatePartsListHighlight() {
+            var partItems = document.querySelectorAll('.part-item');
+            partItems.forEach(function(item) {
+                if (item.dataset.meshId === selectedMeshName) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        }
+        
+        function onMouseMove(event) {
+            if (hoveredFromList) return;
+            
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(modelChildren);
+            
+            if (intersects.length > 0) {
+                const targetMesh = intersects[0].object;
+                selectedMeshName = targetMesh.uuid;
+                var partName = meshUuidToName[targetMesh.uuid] || targetMesh.name || 'mesh part';
+                document.getElementById('debug').innerHTML = 'Hovering: ' + partName;
+                updatePartsListHighlight();
+            } else {
+                selectedMeshName = null;
+                document.getElementById('debug').innerHTML = 'Simple wireframe test';
+                updatePartsListHighlight();
+            }
+        }
+        
+        function createPartsList() {
+            var partsListContent = document.getElementById('partsListContent');
+            partsListContent.innerHTML = '';
+            
+            modelChildren.forEach(function(mesh, index) {
+                var partName = mesh.name || ('Part_' + index);
+                var meshId = mesh.uuid;
+                
+                meshUuidToName[meshId] = partName;
+                
+                var partItem = document.createElement('div');
+                partItem.className = 'part-item';
+                partItem.textContent = partName;
+                partItem.dataset.meshId = meshId;
+                
+                partItem.addEventListener('mouseenter', function() {
+                    hoveredFromList = meshId;
+                    selectedMeshName = meshId;
+                    
+                    // Set the hovered mesh to wireframe
+                    modelChildren.forEach(function(m) {
+                        if (m.uuid === meshId) {
+                            m.material.wireframe = true;
+                            console.log('Set wireframe ON for:', partName);
+                        }
+                    });
+                    
+                    document.getElementById('debug').innerHTML = 'Highlighting: ' + partName;
+                    updatePartsListHighlight();
+                });
+                
+                partItem.addEventListener('mouseleave', function() {
+                    hoveredFromList = null;
+                    selectedMeshName = null;
+                    
+                    // Reset wireframe
+                    modelChildren.forEach(function(m) {
+                        if (m.uuid === meshId) {
+                            m.material.wireframe = false;
+                            console.log('Set wireframe OFF for:', partName);
+                        }
+                    });
+                    
+                    document.getElementById('debug').innerHTML = 'Simple wireframe test';
+                    updatePartsListHighlight();
+                });
+                
+                partsListContent.appendChild(partItem);
+            });
+            
+            console.log('Parts list created with', modelChildren.length, 'items');
+        }
+        
+        document.getElementById('debug').innerHTML = 'Loading shoe...';
+        
+        var loader = new THREE.GLTFLoader();
+        loader.load('shoe_anim.glb', 
+            function(gltf) {
+                document.getElementById('debug').innerHTML = 'SHOE LOADED!';
+                model = gltf.scene;
+                
+                model.traverse(function(child) {
+                    if (child.isMesh) {
+                        modelChildren.push(child);
+                        meshUuidToName[child.uuid] = child.name || child.uuid;
+                        
+                        // Give each mesh a different gray value for better visibility
+                        var meshIndex = modelChildren.length - 1;
+                        var grayValue = 0.3 + (meshIndex * 0.1) % 0.7;
+                        
+                        // Simple solid material - only wireframe on hover
+                        child.material = new THREE.MeshBasicMaterial({
+                            color: new THREE.Color(grayValue, grayValue, grayValue),
+                            wireframe: false // Start as solid
+                        });
+                        
+                        console.log('Found mesh:', child.name || 'unnamed');
+                    }
+                });
+                
+                // Scale the model
+                var box = new THREE.Box3().setFromObject(model);
+                var center = box.getCenter(new THREE.Vector3());
+                var size = box.getSize(new THREE.Vector3());
+                var maxSize = Math.max(size.x, size.y, size.z);
+                var scale = 8 / maxSize;
+                
+                model.position.copy(center).multiplyScalar(-scale);
+                model.scale.setScalar(scale);
+                scene.add(model);
+                
+                createPartsList();
+                
+                window.addEventListener('mousemove', onMouseMove);
+                document.getElementById('debug').innerHTML = 'Ready! Hover over parts list items';
+            },
+            function(progress) {
+                console.log('Loading:', (progress.loaded/progress.total*100) + '%');
+            },
+            function(error) {
+                document.getElementById('debug').innerHTML = 'FAILED: ' + error.message;
+                console.error('Error:', error);
+            }
+        );
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
