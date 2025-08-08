@@ -96,7 +96,7 @@ function loadShoeModel() {
                         meshCount++;
                         console.log('Found mesh:', child.name || ('unnamed_' + meshCount), child);
                         child.material = new THREE.MeshBasicMaterial({
-                            color: 0xffffff,
+                            color: 0xff0000,
                             wireframe: true
                         });
                     }
@@ -149,7 +149,7 @@ function createFallbackCube() {
     
     const geometry = new THREE.BoxGeometry(2, 2, 2);
     const material = new THREE.MeshBasicMaterial({ 
-        color: 0xffffff, 
+        color: 0xff0000, 
         wireframe: true 
     });
     const cube = new THREE.Mesh(geometry, material);
