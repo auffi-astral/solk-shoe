@@ -131,10 +131,12 @@
     <script src="OrbitControls.js"></script>
     <script>
         var scene, camera, renderer, model, controls, scrollY = 0;
-        var renderTargetA, renderTargetB, testMaterial;
+        var renderTargetA, renderTargetB, renderTargetNormals, testMaterial, normalMaterial;
         var modelChildren = [];
         var raycaster, mouse = new THREE.Vector2();
         var selectedMeshName = null;
+        var componentLabels = []; // Array to store 3D number labels
+        var materialComponents = {}; // Will be populated in createPartsList
         var meshUuidToName = {};
         var mixer, animationAction;
         var isExploded = false;
@@ -162,15 +164,35 @@
         
         raycaster = new THREE.Raycaster();
         
-        // Create dual render targets
+        // Create triple render targets for advanced edge detection
         renderTargetA = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
         renderTargetB = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+        renderTargetNormals = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+        
+        // Normal visualization material for geometric edge detection
+        normalMaterial = new THREE.ShaderMaterial({
+            vertexShader: `
+                varying vec3 vNormal;
+                void main() {
+                    vNormal = normalize(normalMatrix * normal);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                varying vec3 vNormal;
+                void main() {
+                    // Convert world space normals to color space (0-1 range)
+                    gl_FragColor = vec4(vNormal * 0.5 + 0.5, 1.0);
+                }
+            `
+        });
         
         // Dual render target edge detection shader
         testMaterial = new THREE.ShaderMaterial({
             uniforms: {
                 tDiffuse1: { value: null }, // All parts
                 tDiffuse2: { value: null }, // Hovered part only
+                tNormals: { value: null },  // Normal buffer for geometric edge detection
                 resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
             },
             vertexShader: `
@@ -183,33 +205,99 @@
             fragmentShader: `
                 uniform sampler2D tDiffuse1; // All parts with edge detection
                 uniform sampler2D tDiffuse2; // Hovered part as full wireframe
+                uniform sampler2D tNormals;  // Normal buffer for geometric edges
                 uniform vec2 resolution;
                 varying vec2 vUv;
                 
+                // Enhanced edge detection with multiple methods
                 float detectEdges(sampler2D tex, vec2 texel) {
-                    float center = texture2D(tex, vUv).r;
-                    float left = texture2D(tex, vUv - vec2(texel.x, 0.0)).r;
-                    float right = texture2D(tex, vUv + vec2(texel.x, 0.0)).r;
-                    float up = texture2D(tex, vUv - vec2(0.0, texel.y)).r;
-                    float down = texture2D(tex, vUv + vec2(0.0, texel.y)).r;
+                    vec2 uv = vUv;
                     
-                    float edge = abs(center - left) + abs(center - right) + 
-                                abs(center - up) + abs(center - down);
+                    // Sample surrounding pixels
+                    float tl = texture2D(tex, uv + vec2(-texel.x, -texel.y)).r; // top-left
+                    float tm = texture2D(tex, uv + vec2(0.0, -texel.y)).r;     // top-middle
+                    float tr = texture2D(tex, uv + vec2(texel.x, -texel.y)).r;  // top-right
+                    float ml = texture2D(tex, uv + vec2(-texel.x, 0.0)).r;      // middle-left
+                    float center = texture2D(tex, uv).r;                        // center
+                    float mr = texture2D(tex, uv + vec2(texel.x, 0.0)).r;       // middle-right
+                    float bl = texture2D(tex, uv + vec2(-texel.x, texel.y)).r;  // bottom-left
+                    float bm = texture2D(tex, uv + vec2(0.0, texel.y)).r;       // bottom-middle
+                    float br = texture2D(tex, uv + vec2(texel.x, texel.y)).r;   // bottom-right
                     
-                    return edge > 0.05 ? 1.0 : 0.0;
+                    // Sobel X operator
+                    float sobelX = (tr + 2.0*mr + br) - (tl + 2.0*ml + bl);
+                    
+                    // Sobel Y operator
+                    float sobelY = (bl + 2.0*bm + br) - (tl + 2.0*tm + tr);
+                    
+                    // Sobel edge magnitude
+                    float sobelMag = sqrt(sobelX*sobelX + sobelY*sobelY);
+                    
+                    // Laplacian edge detection (more sensitive to fine details)
+                    float laplacian = abs(-8.0*center + tl + tm + tr + ml + mr + bl + bm + br);
+                    
+                    // Simple gradient edge detection
+                    float gradientEdge = abs(center - ml) + abs(center - mr) + 
+                                       abs(center - tm) + abs(center - bm);
+                    
+                    // Combine edge detection methods
+                    float combinedEdge = max(sobelMag * 0.8, max(laplacian * 0.3, gradientEdge * 0.5));
+                    
+                    // Simplified threshold for consistent edge detection
+                    float threshold = 0.05;
+                    
+                    return combinedEdge > threshold ? 1.0 : 0.0;
+                }
+                
+                // Normal-based edge detection for geometric edges
+                float detectNormalEdges(sampler2D normalTex, vec2 texel) {
+                    vec2 uv = vUv;
+                    
+                    // Sample center and surrounding normal vectors
+                    vec3 center = texture2D(normalTex, uv).rgb;
+                    vec3 left = texture2D(normalTex, uv - vec2(texel.x, 0.0)).rgb;
+                    vec3 right = texture2D(normalTex, uv + vec2(texel.x, 0.0)).rgb;
+                    vec3 up = texture2D(normalTex, uv - vec2(0.0, texel.y)).rgb;
+                    vec3 down = texture2D(normalTex, uv + vec2(0.0, texel.y)).rgb;
+                    
+                    // Convert from color space back to normal space (-1 to 1)
+                    center = normalize(center * 2.0 - 1.0);
+                    left = normalize(left * 2.0 - 1.0);
+                    right = normalize(right * 2.0 - 1.0);
+                    up = normalize(up * 2.0 - 1.0);
+                    down = normalize(down * 2.0 - 1.0);
+                    
+                    // Calculate angular differences using dot product
+                    float leftDiff = 1.0 - dot(center, left);
+                    float rightDiff = 1.0 - dot(center, right);
+                    float upDiff = 1.0 - dot(center, up);
+                    float downDiff = 1.0 - dot(center, down);
+                    
+                    // Sum angular differences
+                    float normalEdge = leftDiff + rightDiff + upDiff + downDiff;
+                    
+                    // Threshold for normal edges (adjusted for consistency)
+                    return normalEdge > 0.15 ? 1.0 : 0.0;
                 }
                 
                 void main() {
                     vec2 texel = vec2(1.0 / resolution.x, 1.0 / resolution.y);
                     
-                    // Detect edges from all parts (white)
+                    // Detect edges from all parts using multiple methods
                     float baseEdges = detectEdges(tDiffuse1, texel);
+                    float normalEdges = detectNormalEdges(tNormals, texel);
+                    
+                    // Combine edge detection methods with unified output
+                    float combinedEdges = max(baseEdges, normalEdges);
+                    
+                    // Normalize and strengthen edges for consistent visibility
+                    combinedEdges = combinedEdges > 0.05 ? 1.0 : 0.0;
                     
                     // Check if hovered part has wireframe content
                     vec4 hoveredWireframe = texture2D(tDiffuse2, vUv);
                     
-                    // Start with white base edges
-                    vec3 finalColor = vec3(baseEdges);
+                    // Start with white combined edges
+                    vec3 finalColor = vec3(combinedEdges);
                     
                     // If hovered part has wireframe content, show it in red
                     if (hoveredWireframe.r > 0.1) {
@@ -293,50 +381,278 @@
             }
         }
         
+        function createComponentLabels() {
+            // Clear existing labels
+            componentLabels.forEach(function(label) {
+                scene.remove(label);
+            });
+            componentLabels = [];
+            
+            // Create 3D text labels for each component
+            for (var componentNum = 1; componentNum <= 7; componentNum++) {
+                var component = materialComponents[componentNum.toString()];
+                if (!component || component.meshes.length === 0) continue;
+                
+                // Calculate average position of all meshes in this component
+                var avgPosition = new THREE.Vector3();
+                var validMeshCount = 0;
+                
+                component.meshes.forEach(function(item) {
+                    if (item.mesh) {
+                        var bbox = new THREE.Box3().setFromObject(item.mesh);
+                        var center = bbox.getCenter(new THREE.Vector3());
+                        avgPosition.add(center);
+                        validMeshCount++;
+                    }
+                });
+                
+                if (validMeshCount > 0) {
+                    avgPosition.divideScalar(validMeshCount);
+                    
+                    // Create circular background
+                    var circleGeometry = new THREE.CircleGeometry(0.3, 16);
+                    var circleMaterial = new THREE.MeshBasicMaterial({
+                        color: 0x666666,
+                        transparent: true,
+                        opacity: 0.8
+                    });
+                    var circle = new THREE.Mesh(circleGeometry, circleMaterial);
+                    
+                    // Create text using canvas texture
+                    var canvas = document.createElement('canvas');
+                    canvas.width = 64;
+                    canvas.height = 64;
+                    var context = canvas.getContext('2d');
+                    
+                    // Draw white text on transparent background
+                    context.fillStyle = 'white';
+                    context.font = 'bold 40px Arial';
+                    context.textAlign = 'center';
+                    context.textBaseline = 'middle';
+                    context.fillText(componentNum.toString(), 32, 32);
+                    
+                    var texture = new THREE.CanvasTexture(canvas);
+                    var textMaterial = new THREE.MeshBasicMaterial({
+                        map: texture,
+                        transparent: true
+                    });
+                    var textGeometry = new THREE.PlaneGeometry(0.4, 0.4);
+                    var textMesh = new THREE.Mesh(textGeometry, textMaterial);
+                    
+                    // Position text slightly in front of circle
+                    textMesh.position.z = 0.01;
+                    
+                    // Create label group
+                    var labelGroup = new THREE.Group();
+                    labelGroup.add(circle);
+                    labelGroup.add(textMesh);
+                    
+                    // Position label at component center, offset upward
+                    labelGroup.position.copy(avgPosition);
+                    labelGroup.position.y += 1; // Offset upward
+                    
+                    // Make label face camera
+                    labelGroup.lookAt(camera.position);
+                    
+                    // Initially hidden
+                    labelGroup.visible = false;
+                    
+                    scene.add(labelGroup);
+                    componentLabels.push(labelGroup);
+                }
+            }
+        }
+        
         function createPartsList() {
             var partsListContent = document.getElementById('partsListContent');
             partsListContent.innerHTML = '';
             
+            // Define shoe components with material composition info
+            materialComponents = {
+                '1': { 
+                    name: 'Upper', 
+                    meshes: [], 
+                    keywords: ['upper', 'main', 'body', 'vamp', 'quarter', 'toe', 'heel_cap', 'overlay'],
+                    description: 'Our upper leather has undergone a compost-capable tanning process. It\'s from a German tannery with robust environmental management techniques. The leather is chrome free and heavy metal free.'
+                },
+                '2': { 
+                    name: 'Laces & Webbings', 
+                    meshes: [], 
+                    keywords: ['lace', 'eyelet', 'grommet', 'webbing', 'string'],
+                    description: 'These are made out of wood pulp from sustainably harvested eucalyptus, beech, and spruce trees. This yarn fibre has been certified for biodegradability and compostability in various environments.'
+                },
+                '3': { 
+                    name: 'Lace Tips', 
+                    meshes: [], 
+                    keywords: ['aglet', 'tip', 'end', 'cap'],
+                    description: 'Also known as aglets, these tips are made from certified compostable material and attached by our own machine so that every lace is the right length and there\'s no production waste.'
+                },
+                '4': { 
+                    name: 'Glue', 
+                    meshes: [], 
+                    keywords: ['adhesive', 'bond', 'joint', 'cement'],
+                    description: 'Our partially bio-based glue has been specially tested to fit our requirements for product durability and compost-capability. We make sure we only use what\'s essential. Minimising the use of glue helps your shoe breathe.'
+                },
+                '5': { 
+                    name: 'Lining', 
+                    meshes: [], 
+                    keywords: ['lining', 'inner', 'interior', 'collar', 'tongue'],
+                    description: 'The one-piece, zero-waste, knitted-to-shape lining is a SOLK developed blend of compostable yarns and plant fibres that are 100% biobased. We\'ve perfected this knit ourselves to have good all-round performance properties: comfort, fit and breathability.'
+                },
+                '6': { 
+                    name: 'Midsole', 
+                    meshes: [], 
+                    keywords: ['midsole', 'foam', 'cushion', 'mid'],
+                    description: 'Made to fade foamed materials that are as comfortable as they are fully compost-capable.'
+                },
+                '7': { 
+                    name: 'Outsole', 
+                    meshes: [], 
+                    keywords: ['outsole', 'bottom', 'tread', 'rubber', 'sole', 'tpu'],
+                    description: 'Natural rubber quite literally slowly leaks out of a tree (like tree milk). It\'s the original rubber outsole material that coined the phrase sneakers, because they\'re soft and quiet when you walk on them. Pure tree-rubber takes a lot longer to handle and cure, but it\'s worth it for the comfort, sole flexibility, and peace of mind.'
+                }
+            };
+            
+            // Group meshes by component type
             modelChildren.forEach(function(mesh, index) {
                 var partName = mesh.name || ('Part_' + index);
-                var meshId = mesh.uuid; // Use UUID directly for more reliable identification
+                var meshId = mesh.uuid;
+                var grouped = false;
                 
-                // Store the mesh reference for easier lookup
-                meshUuidToName[meshId] = partName;
-                
-                var partItem = document.createElement('div');
-                partItem.className = 'part-item';
-                partItem.textContent = partName;
-                partItem.dataset.meshId = meshId;
-                partItem.dataset.meshIndex = index;
-                
-                partItem.addEventListener('mouseenter', function() {
-                    hoveredFromList = meshId;
-                    selectedMeshName = meshId;
-                    
-                    // Find the mesh and create clean edges
-                    var targetMesh = modelChildren.find(function(m) { return m.uuid === meshId; });
-                    if (targetMesh) {
-                        createHighlightEdges(targetMesh);
+                // Try to match mesh to a component based on name keywords
+                for (var componentNum in materialComponents) {
+                    var component = materialComponents[componentNum];
+                    for (var i = 0; i < component.keywords.length; i++) {
+                        if (partName.toLowerCase().includes(component.keywords[i])) {
+                            component.meshes.push({ mesh: mesh, name: partName, id: meshId });
+                            grouped = true;
+                            break;
+                        }
                     }
-                    
-                    document.getElementById('debug').innerHTML = 'Highlighting: ' + partName;
-                    updatePartsListHighlight();
-                });
+                    if (grouped) break;
+                }
                 
-                partItem.addEventListener('mouseleave', function() {
-                    hoveredFromList = null;
-                    selectedMeshName = null;
+                // If not grouped by name, use position and naming patterns for better grouping
+                if (!grouped) {
+                    var bbox = new THREE.Box3().setFromObject(mesh);
+                    var center = bbox.getCenter(new THREE.Vector3());
+                    var size = bbox.getSize(new THREE.Vector3());
+                    var lowerName = partName.toLowerCase();
                     
-                    removeHighlightEdges();
-                    document.getElementById('debug').innerHTML = isExploded ? 'Exploded - Click to reassemble' : 'Assembled - Click to explode';
-                    updatePartsListHighlight();
-                });
+                    // More intelligent grouping based on patterns and position
+                    if (lowerName.includes('plano') && center.y > -0.2) {
+                        // Plano parts are likely upper components
+                        materialComponents['1'].meshes.push({ mesh: mesh, name: partName, id: meshId });
+                    } else if (lowerName.includes('plano') && center.y <= -0.2) {
+                        // Lower Plano parts might be sole related
+                        materialComponents['7'].meshes.push({ mesh: mesh, name: partName, id: meshId });
+                    } else if (center.y > 0.3) {
+                        // High position = Upper components
+                        materialComponents['1'].meshes.push({ mesh: mesh, name: partName, id: meshId });
+                    } else if (center.y < -0.3) {
+                        // Low position = Outsole
+                        materialComponents['7'].meshes.push({ mesh: mesh, name: partName, id: meshId });
+                    } else {
+                        // Middle position = Midsole
+                        materialComponents['6'].meshes.push({ mesh: mesh, name: partName, id: meshId });
+                    }
+                }
                 
-                partsListContent.appendChild(partItem);
+                meshUuidToName[meshId] = partName;
             });
             
-            console.log('Parts list created with', modelChildren.length, 'items');
+            // Create tooltip element
+            var tooltip = document.createElement('div');
+            tooltip.id = 'material-tooltip';
+            tooltip.style.cssText = 'position: absolute; background: rgba(0,0,0,0.9); color: white; padding: 10px; border-radius: 4px; font-size: 12px; max-width: 300px; z-index: 1000; display: none; pointer-events: none;';
+            document.body.appendChild(tooltip);
+            
+            // Ensure components without meshes still show (like Glue, Lace Tips)
+            if (materialComponents['2'].meshes.length === 0) {
+                // Add placeholder for Laces if no lace meshes found
+                materialComponents['2'].meshes.push({ mesh: null, name: 'Lacing System', id: 'placeholder-laces' });
+            }
+            if (materialComponents['3'].meshes.length === 0) {
+                // Add placeholder for Lace Tips
+                materialComponents['3'].meshes.push({ mesh: null, name: 'Aglets/Tips', id: 'placeholder-tips' });
+            }
+            if (materialComponents['4'].meshes.length === 0) {
+                // Add placeholder for Glue
+                materialComponents['4'].meshes.push({ mesh: null, name: 'Adhesive Bonds', id: 'placeholder-glue' });
+            }
+            if (materialComponents['5'].meshes.length === 0) {
+                // Add placeholder for Lining
+                materialComponents['5'].meshes.push({ mesh: null, name: 'Interior Lining', id: 'placeholder-lining' });
+            }
+            
+            // Create numbered components list
+            for (var componentNum = 1; componentNum <= 7; componentNum++) {
+                var component = materialComponents[componentNum.toString()];
+                if (!component) continue;
+                
+                // Create component header with number
+                var componentHeader = document.createElement('div');
+                componentHeader.className = 'material-component';
+                componentHeader.innerHTML = '<span style="display: inline-block; width: 20px; height: 20px; border-radius: 50%; background: #666; color: white; text-align: center; line-height: 20px; font-size: 12px; margin-right: 8px;">' + componentNum + '</span>' + component.name;
+                componentHeader.style.cssText = 'font-weight: bold; margin: 8px 0; color: #ddd; cursor: pointer; padding: 8px; border-radius: 4px; transition: background 0.2s;';
+                componentHeader.dataset.componentNum = componentNum;
+                
+                // Add hover events for material description
+                componentHeader.addEventListener('mouseenter', function(e) {
+                    var compNum = this.dataset.componentNum;
+                    var comp = materialComponents[compNum];
+                    tooltip.innerHTML = '<strong>' + comp.name + '</strong><br>' + comp.description;
+                    tooltip.style.display = 'block';
+                    tooltip.style.left = (e.pageX + 10) + 'px';
+                    tooltip.style.top = (e.pageY - 10) + 'px';
+                    this.style.background = 'rgba(255,255,255,0.1)';
+                });
+                
+                componentHeader.addEventListener('mouseleave', function(e) {
+                    tooltip.style.display = 'none';
+                    this.style.background = 'transparent';
+                });
+                
+                componentHeader.addEventListener('mousemove', function(e) {
+                    tooltip.style.left = (e.pageX + 10) + 'px';
+                    tooltip.style.top = (e.pageY - 10) + 'px';
+                });
+                
+                // Add hover functionality to highlight ALL meshes in this component
+                if (component.meshes.length > 0) {
+                    componentHeader.addEventListener('mouseenter', function() {
+                        // Highlight all meshes in this component
+                        component.meshes.forEach(function(item) {
+                            if (item.mesh) {
+                                item.mesh.visible = true;
+                                item.mesh.material.wireframe = true;
+                                item.mesh.material.color.setHex(0xff0000);
+                            }
+                        });
+                        
+                        document.getElementById('debug').innerHTML = 'Highlighting: ' + component.name;
+                        updatePartsListHighlight();
+                    });
+                    
+                    componentHeader.addEventListener('mouseleave', function() {
+                        // Reset all meshes in this component
+                        component.meshes.forEach(function(item) {
+                            if (item.mesh && item.mesh.material && item.mesh.userData.originalColor) {
+                                item.mesh.visible = true;
+                                item.mesh.material.wireframe = false;
+                                item.mesh.material.color.copy(item.mesh.userData.originalColor);
+                            }
+                        });
+                        
+                        document.getElementById('debug').innerHTML = isExploded ? 'Exploded - Click to reassemble' : 'Assembled - Click to explode';
+                        updatePartsListHighlight();
+                    });
+                }
+                
+                partsListContent.appendChild(componentHeader);
+            }
+            
+            console.log('Parts list created with grouped components');
         }
         
         var mouseDownPos = { x: 0, y: 0 };
@@ -411,7 +727,7 @@
         document.getElementById('debug').innerHTML = 'Loading animated shoe...';
         
         var loader = new THREE.GLTFLoader();
-        loader.load('shoe_anim.glb', 
+        loader.load('shoe_retopo10.glb', 
             function(gltf) {
                 document.getElementById('debug').innerHTML = 'ANIMATED SHOE LOADED!';
                 model = gltf.scene;
@@ -446,6 +762,11 @@
                     mixer.addEventListener('finished', function() {
                         isAnimating = false;
                         document.getElementById('debug').innerHTML = isExploded ? 'Exploded - Click to reassemble' : 'Assembled - Click to explode';
+                        
+                        // Show/hide component labels based on explosion state
+                        componentLabels.forEach(function(label) {
+                            label.visible = isExploded;
+                        });
                     });
                     
                     document.getElementById('debug').innerHTML = 'Animation ready (' + gltf.animations.length + ' clips) - Click to explode!';
@@ -455,25 +776,39 @@
                 
                 model.traverse(function(child) {
                     if (child.isMesh) {
-                        modelChildren.push(child);
-                        meshUuidToName[child.uuid] = child.name || child.uuid;
+                        // Filter out very small meshes that might be screws, rivets, etc.
+                        var bbox = new THREE.Box3().setFromObject(child);
+                        var size = bbox.getSize(new THREE.Vector3());
+                        var volume = size.x * size.y * size.z;
                         
-                        // Give each mesh part a different gray value so edge detector sees boundaries
-                        var meshIndex = modelChildren.length - 1;
-                        var grayValue = 0.3 + (meshIndex * 0.1) % 0.7; // Different gray values
+                        // Only include meshes with meaningful size and proper names
+                        var hasName = child.name && child.name.length > 0 && !child.name.startsWith('Object_');
+                        var hasSignificantSize = volume > 0.01; // Adjust threshold as needed
                         
-                        child.material = new THREE.MeshBasicMaterial({
-                            color: new THREE.Color(grayValue, grayValue, grayValue)
-                        });
-                        
-                        // Store original material properties for reset
-                        child.userData.originalColor = new THREE.Color(grayValue, grayValue, grayValue);
-                        child.userData.originalWireframe = false;
+                        if (hasName || hasSignificantSize) {
+                            modelChildren.push(child);
+                            meshUuidToName[child.uuid] = child.name || ('Part_' + modelChildren.length);
+                            
+                            // Give each mesh part a different gray value so edge detector sees boundaries
+                            var meshIndex = modelChildren.length - 1;
+                            var grayValue = 0.3 + (meshIndex * 0.1) % 0.7; // Different gray values
+                            
+                            child.material = new THREE.MeshBasicMaterial({
+                                color: new THREE.Color(grayValue, grayValue, grayValue)
+                            });
+                            
+                            // Store original material properties for reset
+                            child.userData.originalColor = new THREE.Color(grayValue, grayValue, grayValue);
+                            child.userData.originalWireframe = false;
+                        }
                     }
                 });
                 
                 // Create the parts list
                 createPartsList();
+                
+                // Create component labels after parts list is ready
+                createComponentLabels();
                 
                 // Scale the model
                 var box = new THREE.Box3().setFromObject(model);
@@ -513,6 +848,13 @@
             }
             controls.update();
             
+            // Update label orientations to face camera
+            componentLabels.forEach(function(label) {
+                if (label.visible) {
+                    label.lookAt(camera.position);
+                }
+            });
+            
             if (model) {
                 // If hovering from parts list, render directly without shader
                 if (hoveredFromList) {
@@ -523,14 +865,27 @@
                 
                 // Normal shader-based rendering only when NOT hovering from list
                 {
-                    // Normal shader-based rendering
-                    // Render renderTargetA (all parts)
+                    // Enhanced shader-based rendering with normal buffer
+                    // Render renderTargetA (all parts with current materials)
                     modelChildren.forEach(function(mesh) {
                         mesh.visible = true;
                     });
-                    
                     renderer.setRenderTarget(renderTargetA);
                     renderer.render(scene, camera);
+                    
+                    // Render normals buffer for geometric edge detection
+                    var originalMaterials = [];
+                    modelChildren.forEach(function(mesh, index) {
+                        originalMaterials[index] = mesh.material;
+                        mesh.material = normalMaterial;
+                    });
+                    renderer.setRenderTarget(renderTargetNormals);
+                    renderer.render(scene, camera);
+                    
+                    // Restore original materials
+                    modelChildren.forEach(function(mesh, index) {
+                        mesh.material = originalMaterials[index];
+                    });
                     
                     // Render renderTargetB (only hovered part as full wireframe)
                     if (selectedMeshName) {
@@ -564,9 +919,10 @@
                         mesh.visible = true;
                     });
                     
-                    // Apply edge detection with both render targets
+                    // Apply enhanced edge detection with all render targets
                     testMaterial.uniforms.tDiffuse1.value = renderTargetA.texture;
                     testMaterial.uniforms.tDiffuse2.value = renderTargetB.texture;
+                    testMaterial.uniforms.tNormals.value = renderTargetNormals.texture;
                     
                     renderer.setRenderTarget(null);
                     
