@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fade 101 - Clean Wireframe Hovers</title>
+    <style>
+        @font-face {
+            font-family: 'Suisse Int\'l';
+            src: url('./webfonts/SuisseIntl-Regular.woff2') format('woff2');
+            font-weight: normal;
+            font-style: normal;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body { 
+            background: #E7E7E3; 
+            overflow-x: hidden; 
+            cursor: pointer; 
+            font-family: 'Suisse Int\'l', sans-serif;
+        }
+        
+        #container {
+            position: fixed;
+            width: 100vw;
+            height: 100vh;
+            left: 0;
+            top: 0;
+        }
+        
+        #mainContainer {
+            position: fixed;
+            top: 50%;
+            right: 60px;
+            transform: translateY(-50%);
+            width: calc(33vw - 120px);
+            min-width: 320px;
+            z-index: 100;
+            font-family: 'Suisse Int\'l', sans-serif;
+        }
+        
+        #title {
+            text-align: left;
+            margin-bottom: 24px;
+        }
+        
+        #title h1 {
+            font-family: 'Suisse Int\'l';
+            font-style: normal;
+            font-weight: 400;
+            font-size: 42px;
+            line-height: 48px;
+            color: #333333;
+            margin: 0;
+            letter-spacing: -0.02em;
+        }
+        
+        #title h2 {
+            font-family: 'Suisse Int\'l';
+            font-style: normal;
+            font-weight: 400;
+            font-size: 42px;
+            line-height: 48px;
+            color: #A4A4A4;
+            margin: 0;
+            letter-spacing: -0.02em;
+        }
+        
+        #partsList {
+            width: 100%;
+        }
+        
+        .parts-item {
+            margin-bottom: 1px;
+            background: transparent;
+        }
+        
+        .parts-header {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+            cursor: pointer;
+            border-bottom: 1px solid #ccc;
+            transition: all 0.2s ease;
+        }
+        
+        .parts-header:hover {
+            border-bottom-color: #999;
+        }
+        
+        .part-circle {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #000;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            margin-right: 12px;
+            flex-shrink: 0;
+            font-family: 'Suisse Int\'l', sans-serif;
+        }
+        
+        .part-name {
+            font-size: 16px;
+            font-weight: normal;
+            color: #000;
+            flex-grow: 1;
+        }
+        
+        .parts-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            padding-left: 32px;
+        }
+        
+        .parts-content.expanded {
+            max-height: 150px;
+            padding-top: 8px;
+            padding-bottom: 8px;
+        }
+        
+        .parts-description {
+            font-size: 13px;
+            line-height: 1.4;
+            color: #666;
+        }
+        
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(40, 40, 40, 0.95);
+            border: 1px solid #555;
+            border-radius: 8px;
+            padding: 0;
+            z-index: 100;
+            width: 250px;
+            overflow: hidden;
+            transition: height 0.3s ease;
+            color: #fff;
+        }
+        
+        #controlsHeader {
+            padding: 15px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            background: #333;
+            border-bottom: 1px solid #555;
+            user-select: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #fff;
+        }
+        
+        #controlsHeader:hover {
+            background: #444;
+        }
+        
+        #controlsContent {
+            padding: 15px;
+            display: none;
+            background: #2a2a2a;
+        }
+        
+        #controls.expanded #controlsContent {
+            display: block;
+        }
+        
+        .expand-arrow {
+            transform: rotate(0deg);
+            transition: transform 0.3s ease;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        
+        #controls.expanded .expand-arrow {
+            transform: rotate(180deg);
+        }
+        
+        .control-group {
+            margin-bottom: 12px;
+        }
+        
+        .control-group label {
+            display: block;
+            font-size: 12px;
+            font-weight: 500;
+            margin-bottom: 4px;
+            color: #ddd;
+        }
+        
+        .control-group input[type="range"] {
+            width: 100%;
+            margin-bottom: 4px;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 4px;
+            border-radius: 2px;
+            background: #ddd;
+            outline: none;
+        }
+        
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #FFD700;
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .control-group input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #FFD700;
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .control-value {
+            font-size: 10px;
+            color: #bbb;
+            text-align: right;
+        }
+        
+        #content { height: 300vh; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    
+    <div id="partName" style="position: fixed; top: 20px; left: 20px; background: rgba(255, 255, 255, 0.9); border: 1px solid #ddd; border-radius: 6px; padding: 12px 16px; font-family: 'Suisse Int\'l', sans-serif; font-size: 14px; color: #333; z-index: 100; min-width: 200px; opacity: 0; transition: opacity 0.2s ease;">
+        <strong>Part:</strong> <span id="partNameText">None</span>
+    </div>
+    
+    <div id="mainContainer">
+        <div id="title">
+            <h1>Fade 101</h1>
+            <h2>Technical Breakdown</h2>
+        </div>
+        
+        <div id="partsList">
+        <div class="parts-item" data-part="1">
+            <div class="parts-header">
+                <div class="part-circle">1</div>
+                <div class="part-name">Upper</div>
+            </div>
+            <div class="parts-content">
+                <div class="parts-description">
+                    Our upper leather has undergone a compost-capable tanning process. It's from a German tannery with robust environmental management techniques. The leather is chrome free and heavy metal free.
+                </div>
+            </div>
+        </div>
+        
+        <div class="parts-item" data-part="2">
+            <div class="parts-header">
+                <div class="part-circle">2</div>
+                <div class="part-name">Laces & Webbings</div>
+            </div>
+            <div class="parts-content">
+                <div class="parts-description">
+                    These are made out of wood pulp from sustainably harvested eucalyptus, beech, and spruce trees. This yarn fibre has been certified for biodegradability and compostability in various environments.
+                </div>
+            </div>
+        </div>
+        
+        <div class="parts-item" data-part="3">
+            <div class="parts-header">
+                <div class="part-circle">3</div>
+                <div class="part-name">Lace Tips</div>
+            </div>
+            <div class="parts-content">
+                <div class="parts-description">
+                    Also known as aglets, these tips are made from certified compostable material and attached by our own machine so that every lace is the right length and there's no production waste.
+                </div>
+            </div>
+        </div>
+        
+        <div class="parts-item" data-part="4">
+            <div class="parts-header">
+                <div class="part-circle">4</div>
+                <div class="part-name">Glue</div>
+            </div>
+            <div class="parts-content">
+                <div class="parts-description">
+                    Our partially bio-based glue has been specially tested to fit our requirements for product durability and compost-capability. We make sure we only use what's essential.
+                </div>
+            </div>
+        </div>
+        
+        <div class="parts-item" data-part="5">
+            <div class="parts-header">
+                <div class="part-circle">5</div>
+                <div class="part-name">Lining</div>
+            </div>
+            <div class="parts-content">
+                <div class="parts-description">
+                    The one-piece, zero-waste, knitted-to-shape lining is a SOLK developed blend of compostable yarns and plant fibres that are 100% biobased.
+                </div>
+            </div>
+        </div>
+        
+        <div class="parts-item" data-part="6">
+            <div class="parts-header">
+                <div class="part-circle">6</div>
+                <div class="part-name">Midsole</div>
+            </div>
+            <div class="parts-content">
+                <div class="parts-description">
+                    Made to fade foamed materials that are as comfortable as they are fully compost-capable.
+                </div>
+            </div>
+        </div>
+        
+        <div class="parts-item" data-part="7">
+            <div class="parts-header">
+                <div class="part-circle">7</div>
+                <div class="part-name">Outsole</div>
+            </div>
+            <div class="parts-content">
+                <div class="parts-description">
+                    Natural rubber quite literally slowly leaks out of a tree (like tree milk). It's the original rubber outsole material that coined the phrase sneakers.
+                </div>
+            </div>
+        </div>
+        </div>
+    </div>
+    
+    <div id="controls">
+        <div id="controlsHeader">
+            <span>Shader Settings</span>
+            <span class="expand-arrow">v</span>
+        </div>
+        <div id="controlsContent">
+            <div class="control-group">
+                <label>Edge Threshold</label>
+                <input type="range" id="edgeThreshold" min="0.05" max="0.5" step="0.01" value="0.15">
+                <div class="control-value">Value: <span id="edgeValue">0.15</span></div>
+            </div>
+            
+            <div class="control-group">
+                <label>Line Width</label>
+                <input type="range" id="lineWidth" min="0.5" max="3.0" step="0.1" value="1.0">
+                <div class="control-value">Value: <span id="lineValue">1.0</span></div>
+            </div>
+            
+            <div class="control-group">
+                <label>Detail Intensity</label>
+                <input type="range" id="detailIntensity" min="0.0" max="1.0" step="0.1" value="0.5">
+                <div class="control-value">Value: <span id="detailValue">0.5</span></div>
+            </div>
+            
+            <div class="control-group">
+                <label>Sobel Weight</label>
+                <input type="range" id="sobelWeight" min="0.0" max="2.0" step="0.1" value="1.0">
+                <div class="control-value">Value: <span id="sobelValue">1.0</span></div>
+            </div>
+            
+            <div class="control-group">
+                <label>Scharr Weight</label>
+                <input type="range" id="scharrWeight" min="0.0" max="3.0" step="0.1" value="1.0">
+                <div class="control-value">Value: <span id="scharrValue">1.0</span></div>
+            </div>
+            
+            <div class="control-group">
+                <label>Laplacian Scale</label>
+                <input type="range" id="laplacianScale" min="0.0" max="3.0" step="0.1" value="0.8">
+                <div class="control-value">Value: <span id="laplacianValue">0.8</span></div>
+            </div>
+            
+            <div class="control-group">
+                <label>Contrast Boost</label>
+                <input type="range" id="contrastBoost" min="0.5" max="3.0" step="0.1" value="1.0">
+                <div class="control-value">Value: <span id="contrastValue">1.0</span></div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="content"></div>
+
+    <script src="three.min.js"></script>
+    <script src="GLTFLoader.js"></script>
+    <script src="OrbitControls.js"></script>
+    <script>
+        var scene, camera, renderer, model, controls;
+        var modelChildren = [];
+        var mixer, animationAction;
+        var isExploded = false;
+        var isAnimating = false;
+        var selectedPart = null;
+        var currentlyClickedPart = null;
+        var currentAccordionOpen = null;
+        var savedRotationAngle = 0;
+        var hoveredPart = null;
+        var highlightedParts = [];
+        var cumulativeScrollY = 0;
+        var lastScrollTime = 0;
+        var isScrolling = false;
+        var wasScrolling = false;
+        var autoRotateOffset = 0;
+        var containerWidth = window.innerWidth;
+        var mouse = new THREE.Vector2();
+        var raycaster = new THREE.Raycaster();
+
+        // Camera animation variables
+        var cameraAnimating = false;
+        var cameraAnimationProgress = 0;
+        var initialCameraPosition = new THREE.Vector3(0, 2, 8);
+        var initialCameraTarget = new THREE.Vector3(0, 0, 0);
+        var targetCameraPosition = new THREE.Vector3();
+        var targetCameraTarget = new THREE.Vector3();
+        var currentPartFocus = null;
+        var autoRotateInitial = true;
+        var autoRotateTime = 0;
+
+        // Initialize Three.js scene
+        console.log('Container width:', containerWidth);
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xE7E7E3);
+        
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 2, 8);
+        // Shift viewport 200px to the right to make shoe appear left
+        camera.setViewOffset(window.innerWidth, window.innerHeight, 200, 0, window.innerWidth, window.innerHeight);
+
+        renderer = new THREE.WebGLRenderer({
+            antialias: true,
+            powerPreference: 'high-performance'
+        });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('container').appendChild(renderer.domElement);
+        
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableZoom = true;
+        controls.enablePan = true;
+        controls.enableRotate = true;
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        
+        // Custom zoom and pan controls
+        controls.mouseButtons = {
+            LEFT: THREE.MOUSE.ROTATE,
+            MIDDLE: null,
+            RIGHT: THREE.MOUSE.PAN
+        };
+        
+        // Disable default zoom, we'll handle it manually
+        controls.enableZoom = false;
+        // Set target to match model center for consistent rotation axis
+        controls.target.set(0, 0, 0);
+        
+        // Lighting - consistent for edge detection
+        var light = new THREE.AmbientLight(0xffffff, 0.9);
+        scene.add(light);
+        
+        var directionalLight = new THREE.DirectionalLight(0xffffff, 0.3);
+        directionalLight.position.set(0, 10, 0); // From directly above for consistent lighting
+        scene.add(directionalLight);
+        
+        // Render targets for edge detection
+        var renderTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+        var fillRenderTarget = new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight);
+        
+        // Enhanced multi-scale edge detection shader with fill support
+        var edgeShader = new THREE.ShaderMaterial({
+            uniforms: {
+                tDiffuse: { value: null },
+                tFill: { value: null },
+                resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+                edgeThreshold: { value: 0.15 },
+                lineWidth: { value: 1.0 },
+                detailIntensity: { value: 0.5 },
+                sobelWeight: { value: 1.0 },
+                scharrWeight: { value: 1.0 },
+                laplacianScale: { value: 0.8 },
+                contrastBoost: { value: 1.0 }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform sampler2D tFill;
+                uniform vec2 resolution;
+                uniform float edgeThreshold;
+                uniform float lineWidth;
+                uniform float detailIntensity;
+                uniform float sobelWeight;
+                uniform float scharrWeight;
+                uniform float laplacianScale;
+                uniform float contrastBoost;
+                varying vec2 vUv;
+                
+                // Enhanced Sobel edge detection with better stability
+                float sobel(sampler2D tex, vec2 texel) {
+                    vec2 uv = vUv;
+                    
+                    // Sample 3x3 kernel - use all RGB channels for better stability
+                    vec3 tl = texture2D(tex, uv + vec2(-texel.x, -texel.y)).rgb;
+                    vec3 tm = texture2D(tex, uv + vec2(0.0, -texel.y)).rgb;
+                    vec3 tr = texture2D(tex, uv + vec2(texel.x, -texel.y)).rgb;
+                    vec3 ml = texture2D(tex, uv + vec2(-texel.x, 0.0)).rgb;
+                    vec3 mm = texture2D(tex, uv).rgb;
+                    vec3 mr = texture2D(tex, uv + vec2(texel.x, 0.0)).rgb;
+                    vec3 bl = texture2D(tex, uv + vec2(-texel.x, texel.y)).rgb;
+                    vec3 bm = texture2D(tex, uv + vec2(0.0, texel.y)).rgb;
+                    vec3 br = texture2D(tex, uv + vec2(texel.x, texel.y)).rgb;
+                    
+                    // Convert to luminance for edge detection
+                    float tl_lum = dot(tl, vec3(0.299, 0.587, 0.114));
+                    float tm_lum = dot(tm, vec3(0.299, 0.587, 0.114));
+                    float tr_lum = dot(tr, vec3(0.299, 0.587, 0.114));
+                    float ml_lum = dot(ml, vec3(0.299, 0.587, 0.114));
+                    float mm_lum = dot(mm, vec3(0.299, 0.587, 0.114));
+                    float mr_lum = dot(mr, vec3(0.299, 0.587, 0.114));
+                    float bl_lum = dot(bl, vec3(0.299, 0.587, 0.114));
+                    float bm_lum = dot(bm, vec3(0.299, 0.587, 0.114));
+                    float br_lum = dot(br, vec3(0.299, 0.587, 0.114));
+                    
+                    // Sobel operators
+                    float sobelX = (tr_lum + 2.0*mr_lum + br_lum) - (tl_lum + 2.0*ml_lum + bl_lum);
+                    float sobelY = (bl_lum + 2.0*bm_lum + br_lum) - (tl_lum + 2.0*tm_lum + tr_lum);
+                    
+                    return sqrt(sobelX*sobelX + sobelY*sobelY);
+                }
+                
+                // Fine detail detection using Laplacian
+                float laplacian(sampler2D tex, vec2 texel) {
+                    vec2 uv = vUv;
+                    
+                    float center = texture2D(tex, uv).r;
+                    float top = texture2D(tex, uv + vec2(0.0, -texel.y)).r;
+                    float bottom = texture2D(tex, uv + vec2(0.0, texel.y)).r;
+                    float left = texture2D(tex, uv + vec2(-texel.x, 0.0)).r;
+                    float right = texture2D(tex, uv + vec2(texel.x, 0.0)).r;
+                    
+                    // Laplacian kernel: captures fine details and sharp changes
+                    return abs(4.0 * center - top - bottom - left - right);
+                }
+                
+                // Scharr operator for high-quality edge detection
+                float scharr(sampler2D tex, vec2 texel) {
+                    vec2 uv = vUv;
+                    
+                    // Sample 3x3 kernel
+                    float tl = texture2D(tex, uv + vec2(-texel.x, -texel.y)).r;
+                    float tm = texture2D(tex, uv + vec2(0.0, -texel.y)).r;
+                    float tr = texture2D(tex, uv + vec2(texel.x, -texel.y)).r;
+                    float ml = texture2D(tex, uv + vec2(-texel.x, 0.0)).r;
+                    float mr = texture2D(tex, uv + vec2(texel.x, 0.0)).r;
+                    float bl = texture2D(tex, uv + vec2(-texel.x, texel.y)).r;
+                    float bm = texture2D(tex, uv + vec2(0.0, texel.y)).r;
+                    float br = texture2D(tex, uv + vec2(texel.x, texel.y)).r;
+                    
+                    // Scharr operators (more rotation invariant than Sobel)
+                    float scharrX = (3.0*tr + 10.0*mr + 3.0*br) - (3.0*tl + 10.0*ml + 3.0*bl);
+                    float scharrY = (3.0*bl + 10.0*bm + 3.0*br) - (3.0*tl + 10.0*tm + 3.0*tr);
+                    
+                    return sqrt(scharrX*scharrX + scharrY*scharrY) / 32.0;
+                }
+                
+                void main() {
+                    vec2 texel = vec2(1.0 / resolution.x, 1.0 / resolution.y) * lineWidth;
+                    
+                    // Adjustable edge detection
+                    float sobelEdge = sobel(tDiffuse, texel) * sobelWeight;
+                    float scharrEdge = scharr(tDiffuse, texel) * scharrWeight;
+                    
+                    // Optional detail enhancement (controlled by sliders)
+                    float detailEdge = laplacian(tDiffuse, texel * laplacianScale);
+                    
+                    // Combine primary edges - use additive instead of max for better control
+                    float primaryEdge = sobelEdge + scharrEdge;
+                    float combinedEdge = primaryEdge + (detailEdge * detailIntensity * 0.3);
+                    
+                    // Apply contrast boost and threshold
+                    combinedEdge *= contrastBoost;
+                    float finalEdge = combinedEdge > edgeThreshold ? 1.0 : 0.0;
+                    
+                    // Get fill color (yellow for hovered parts)
+                    vec3 fillColor = texture2D(tFill, vUv).rgb;
+                    
+                    // Technical drawing colors
+                    vec3 lineColor = vec3(0.0); // Black lines
+                    vec3 bgColor = vec3(0.906, 0.906, 0.890); // #E7E7E3 background
+                    
+                    // Only show fill if it's significantly different from background (yellow hover)
+                    float fillStrength = step(0.3, length(fillColor - bgColor));
+                    vec3 baseFill = mix(bgColor, fillColor, fillStrength);
+                    vec3 finalColor = mix(baseFill, lineColor, finalEdge);
+                    
+                    gl_FragColor = vec4(finalColor, 1.0);
+                }
+            `
+        });
+        
+        // Load model
+        var loader = new THREE.GLTFLoader();
+        console.log('About to load model, canvas size:', renderer.domElement.width, 'x', renderer.domElement.height);
+        
+        loader.load('shoe_group_fixes_ver3.glb', 
+            function(gltf) {
+                model = gltf.scene;
+                
+                // Setup animations
+                mixer = new THREE.AnimationMixer(model);
+                
+                if (gltf.animations.length > 0) {
+                    var actions = [];
+                    gltf.animations.forEach(function(clip) {
+                        var action = mixer.clipAction(clip);
+                        action.setLoop(THREE.LoopOnce);
+                        action.clampWhenFinished = true;
+                        action.time = 0;
+                        action.paused = true;
+                        action.play();
+                        actions.push(action);
+                    });
+                    
+                    animationAction = actions[0];
+                    mixer.allActions = actions;
+                    
+                    mixer.addEventListener('finished', function() {
+                        isAnimating = false;
+                        // DON'T modify rotation angles here - keep them exactly as they are
+                    });
+                }
+                
+                // Process meshes - use background color for clean look, different grays only for edge detection
+                model.traverse(function(child) {
+                    if (child.isMesh) {
+                        modelChildren.push(child);
+                        
+                        // Use different gray values ONLY for edge detection pass
+                        var grayValue = 0.3 + (modelChildren.length * 0.15) % 0.4;
+                        child.userData.edgeDetectionColor = new THREE.Color(grayValue, grayValue, grayValue);
+                        
+                        // Default material: background color (invisible until hovered) - using MeshBasicMaterial for consistent rendering
+                        child.material = new THREE.MeshBasicMaterial({
+                            color: new THREE.Color(0.906, 0.906, 0.890), // Same as background #E7E7E3
+                        });
+                        
+                        // Create materials for different passes - using MeshBasicMaterial to avoid lighting artifacts
+                        child.userData.backgroundMaterial = new THREE.MeshBasicMaterial({
+                            color: new THREE.Color(0.906, 0.906, 0.890), // Background color
+                        });
+                        child.userData.edgeMaterial = new THREE.MeshBasicMaterial({
+                            color: child.userData.edgeDetectionColor,
+                        });
+                        child.userData.hoverMaterial = new THREE.MeshBasicMaterial({
+                            color: new THREE.Color(1.0, 0.9, 0.0), // Yellow
+                        });
+                        child.userData.partIndex = modelChildren.length - 1;
+                        
+                        // Assign part names based on mesh names or index
+                        var partNames = ['Upper', 'Laces & Webbings', 'Lace Tips', 'Glue', 'Lining', 'Midsole', 'Outsole'];
+                        child.userData.partName = child.name || partNames[child.userData.partIndex % partNames.length] || 'Part ' + (child.userData.partIndex + 1);
+                    }
+                });
+                
+                // Center and scale model - smaller size
+                var box = new THREE.Box3().setFromObject(model);
+                var center = box.getCenter(new THREE.Vector3());
+                var size = box.getSize(new THREE.Vector3());
+                var maxSize = Math.max(size.x, size.y, size.z);
+                var scale = (5 / maxSize) * 2.2; // Much bigger size
+
+                // Center the model
+                model.position.set(-center.x * scale, -center.y * scale, -center.z * scale);
+                model.scale.setScalar(scale);
+                model.rotation.y = 0;
+                scene.add(model);
+
+                // Update controls target to match model center
+                controls.target.set(0, 0, 0);
+                controls.update();
+            },
+            function(progress) {
+                console.log('Loading:', (progress.loaded/progress.total*100) + '%');
+            },
+            function(error) {
+                console.error('Error loading model:', error);
+            }
+        );
+        
+        // Camera animation to focus on specific part
+        function animateCameraToFocusPart(partNumber) {
+            // Store previous camera position for smooth transition
+            if (!cameraAnimating) {
+                initialCameraPosition.copy(camera.position);
+                initialCameraTarget.copy(controls.target);
+            }
+
+            cameraAnimating = true;
+            cameraAnimationProgress = 0;
+            currentPartFocus = partNumber;
+
+            // Stop initial auto-rotation when focusing on a part
+            autoRotateInitial = false;
+
+            // Define camera positions for each part - adjusted for better viewing and zoom
+            var cameraSettings = {
+                '1': { position: new THREE.Vector3(-1.5, 3, 7), target: new THREE.Vector3(-0.5, 1.5, 0) }, // Upper - zoomed out more
+                '2': { position: new THREE.Vector3(0, 3.5, 6), target: new THREE.Vector3(0, 2, 0) }, // Laces - higher angle
+                '3': { position: new THREE.Vector3(0, 2, 8), target: new THREE.Vector3(0, 1.5, 0) }, // Lace Tips - straight on, zoomed out
+                '4': { position: new THREE.Vector3(0, 1.8, 7), target: new THREE.Vector3(0, 1, 0) }, // Glue
+                '5': { position: new THREE.Vector3(-0.5, 2, 7), target: new THREE.Vector3(0, 0.8, 0) }, // Lining
+                '6': { position: new THREE.Vector3(-0.5, 0.2, 9), target: new THREE.Vector3(0, -0.3, 0) }, // Midsole - side angle, zoomed out
+                '7': { position: new THREE.Vector3(0, -3, 10), target: new THREE.Vector3(0, -2, 0) }  // Outsole - much lower, far back
+            };
+
+            var settings = cameraSettings[partNumber] || cameraSettings['1'];
+            targetCameraPosition.copy(settings.position);
+            targetCameraTarget.copy(settings.target);
+        }
+
+        function animateCameraToInitial() {
+            // Store current position for smooth transition back
+            initialCameraPosition.copy(camera.position);
+            initialCameraTarget.copy(controls.target);
+
+            cameraAnimating = true;
+            cameraAnimationProgress = 0;
+            currentPartFocus = null;
+            targetCameraPosition.set(0, 2, 8);
+            targetCameraTarget.set(0, 0, 0);
+        }
+
+        // Explode/Assemble functionality tied to accordion state
+        function triggerExplode() {
+            if (isAnimating || !mixer || !mixer.allActions) return;
+
+            // Capture current rotation to prevent jumps
+            if (model) {
+                savedRotationAngle = model.rotation.y;
+                cumulativeScrollY = 0;
+                autoRotateOffset = 0;
+            }
+
+            isAnimating = true;
+
+            if (!isExploded) {
+                // Explode
+                mixer.allActions.forEach(function(action) {
+                    action.timeScale = 1;
+                    action.paused = false;
+                    action.play();
+                });
+                isExploded = true;
+            }
+        }
+
+        function triggerAssemble() {
+            if (isAnimating || !mixer || !mixer.allActions) return;
+
+            // Capture current angle to prevent jumps
+            if (model) {
+                savedRotationAngle = model.rotation.y;
+                cumulativeScrollY = 0;
+                autoRotateOffset = 0;
+            }
+
+            isAnimating = true;
+
+            if (isExploded) {
+                // Reassemble
+                mixer.allActions.forEach(function(action) {
+                    action.timeScale = -1;
+                    action.paused = false;
+                    action.play();
+                });
+                isExploded = false;
+            }
+
+            // Animate camera back to initial position
+            animateCameraToInitial();
+        }
+        
+        // Check if any accordion items are open
+        function hasOpenAccordion() {
+            var expandedItems = document.querySelectorAll('.parts-content.expanded');
+            return expandedItems.length > 0;
+        }
+        
+        // Simple, clean assembly check
+        function checkAndForceAssemble() {
+            var expandedCount = document.querySelectorAll('.parts-content.expanded').length;
+            
+            if (isExploded && expandedCount === 0 && !isAnimating) {
+                currentlyClickedPart = null;
+                currentAccordionOpen = null;
+                clearHighlights();
+                triggerAssemble();
+                return true;
+            }
+            return false;
+        }
+        
+        // Function to find parts by name pattern
+        function findPartsByName(searchTerms) {
+            if (!Array.isArray(searchTerms)) searchTerms = [searchTerms];
+            
+            return modelChildren.filter(function(child) {
+                if (!child.name) return false;
+                var childName = child.name.toLowerCase();
+                return searchTerms.some(function(term) {
+                    return childName.includes(term.toLowerCase());
+                });
+            });
+        }
+        
+        // Function to find only the exact "sole" part (not midsole)
+        function findSolePart() {
+            return modelChildren.filter(function(child) {
+                if (!child.name) return false;
+                var childName = child.name.toLowerCase();
+                // Only match "sole" exactly, not "midsole" or other variations
+                return childName === 'sole' || childName.startsWith('sole_') || (childName.includes('sole') && !childName.includes('midsole'));
+            });
+        }
+        
+        // Function to find "Upper" parts (specific inclusion list)
+        function findUpperParts() {
+            var upperPartNames = [
+                'midsole_ver1003', 'midsole_ver1001', 'midsole_ver1004', 'midsole_ver1008', 
+                'midsole_ver1031', 'midsole_ver1005', 'midsole_ver1032', 'midsole_ver1033', 
+                'midsole_ver1030', 'midsole_ver1002', 'ring', 'stripe'
+            ];
+            
+            return modelChildren.filter(function(child) {
+                if (!child.name) return false;
+                var childName = child.name.toLowerCase();
+                
+                // Check if part name matches any of the upper part names
+                return upperPartNames.some(function(partName) {
+                    return childName.includes(partName.toLowerCase());
+                });
+            });
+        }
+        
+        // Function to clear all highlights
+        function clearHighlights() {
+            highlightedParts = [];
+        }
+        
+        // Function to highlight specific parts
+        function highlightParts(parts) {
+            clearHighlights();
+            highlightedParts = parts;
+        }
+        
+        // Function to determine which accordion item a part belongs to
+        function getAccordionNumberForPart(partName) {
+            if (!partName) return null;
+            
+            var lowerName = partName.toLowerCase();
+            
+            // Check Upper parts (Accordion 1)
+            var upperPartNames = [
+                'midsole_ver1003', 'midsole_ver1001', 'midsole_ver1004', 'midsole_ver1008', 
+                'midsole_ver1031', 'midsole_ver1005', 'midsole_ver1032', 'midsole_ver1033', 
+                'midsole_ver1030', 'midsole_ver1002', 'ring'
+            ];
+            if (upperPartNames.some(function(name) { return lowerName.includes(name.toLowerCase()); })) {
+                return '1';
+            }
+            
+            // Check other specific parts
+            if (lowerName.includes('schnuersenkel') && !lowerName.includes('schnuersenkel_tip')) {
+                return '2'; // Laces & Webbings
+            }
+            if (lowerName.includes('schnuersenkel_tip')) {
+                return '3'; // Lace Tips
+            }
+            if (lowerName.includes('einlage')) {
+                return '4'; // Glue
+            }
+            if (lowerName.includes('ring') && !upperPartNames.some(function(name) { return lowerName.includes(name.toLowerCase()); })) {
+                return '5'; // Lining (if not already caught by Upper)
+            }
+            if (lowerName.includes('foam')) {
+                return '6'; // Midsole
+            }
+            if (lowerName.includes('sole') && !lowerName.includes('midsole')) {
+                return '7'; // Outsole
+            }
+            
+            return null; // Unknown part
+        }
+        
+        // Function to open specific accordion item
+        function openAccordionItem(partNumber) {
+            if (!partNumber) return;
+            
+            // Check if accordion interaction is broken due to model click state
+            if (currentlyClickedPart && currentAccordionOpen && currentAccordionOpen !== partNumber) {
+                // Reset state to allow proper accordion interaction
+                currentlyClickedPart = null;
+                currentAccordionOpen = null;
+            }
+            
+            // Close all accordion items first
+            document.querySelectorAll('.parts-content').forEach(function(content) {
+                content.classList.remove('expanded');
+            });
+            clearHighlights();
+            
+            // Open the specific accordion item
+            var targetItem = document.querySelector('.parts-item[data-part="' + partNumber + '"]');
+            if (targetItem) {
+                var content = targetItem.querySelector('.parts-content');
+                if (content) {
+                    content.classList.add('expanded');
+                    currentAccordionOpen = partNumber;
+                    
+                    // Trigger highlighting and explode
+                    var parts = [];
+                    switch(partNumber) {
+                        case '1': parts = findUpperParts(); break;
+                        case '2': parts = findPartsByName('schnuersenkel'); break;
+                        case '3': parts = findPartsByName('schnuersenkel_tip'); break;
+                        case '4': parts = findPartsByName('einlage'); break;
+                        case '5': parts = findPartsByName('ring'); break;
+                        case '6': parts = findPartsByName('foam'); break;
+                        case '7': parts = findSolePart(); break;
+                    }
+                    highlightParts(parts);
+
+                    // Animate camera to focus on this part
+                    animateCameraToFocusPart(partNumber);
+
+                    // Always trigger explode, even if already exploded (for switching between parts)
+                    if (!isExploded) {
+                        triggerExplode();
+                    }
+                    // If already exploded, just ensure the state is properly set
+                    else {
+                        // Already exploded, just updating highlights - make sure state is consistent
+                        currentAccordionOpen = partNumber;
+                    }
+                }
+            }
+        }
+        
+        // Accordion functionality with highlighting and explode/assemble
+        document.querySelectorAll('.parts-header').forEach(function(header) {
+            header.addEventListener('click', function() {
+                // Stop initial auto-rotation on first interaction
+                autoRotateInitial = false;
+
+                var item = this.parentElement;
+                var content = item.querySelector('.parts-content');
+                var partNumber = item.getAttribute('data-part');
+
+                // Check if this item is currently expanded
+                var wasExpanded = content.classList.contains('expanded');
+                
+                // Close all other items
+                document.querySelectorAll('.parts-item').forEach(function(otherItem) {
+                    if (otherItem !== item) {
+                        otherItem.querySelector('.parts-content').classList.remove('expanded');
+                    }
+                });
+                
+                // Toggle current item
+                var isExpanding = !wasExpanded;
+                if (isExpanding) {
+                    content.classList.add('expanded');
+                } else {
+                    content.classList.remove('expanded');
+                }
+                
+                // Handle highlighting based on part
+                if (isExpanding) {
+                    var parts = [];
+                    switch(partNumber) {
+                        case '1': // Upper
+                            parts = findUpperParts();
+                            break;
+                        case '2': // Laces & Webbings
+                            parts = findPartsByName('schnuersenkel');
+                            break;
+                        case '3': // Lace Tips
+                            parts = findPartsByName('schnuersenkel_tip');
+                            break;
+                        case '4': // Glue
+                            parts = findPartsByName('einlage');
+                            break;
+                        case '5': // Lining
+                            parts = findPartsByName('ring');
+                            break;
+                        case '6': // Midsole
+                            parts = findPartsByName('foam');
+                            break;
+                        case '7': // Outsole
+                            parts = findSolePart();
+                            break;
+                    }
+                    highlightParts(parts);
+
+                    // Animate camera to focus on this part
+                    animateCameraToFocusPart(partNumber);
+
+                    // Trigger explode when opening accordion, or just update state if already exploded
+                    if (!isExploded) {
+                        triggerExplode();
+                    }
+                    // Update state for accordion switching
+                    currentAccordionOpen = partNumber;
+                } else {
+                    // Closing accordion - reset all state
+                    clearHighlights();
+                    currentlyClickedPart = null;
+                    currentAccordionOpen = null;
+                    
+                    // Trigger assemble when closing accordion (and no others are open)
+                    setTimeout(function() {
+                        checkAndForceAssemble();
+                    }, 50); // Small delay to ensure DOM updates
+                }
+            });
+        });
+        
+        // Enhanced scroll handling - rotation or zoom based on modifier keys
+        function onWheel(event) {
+            event.preventDefault();
+
+            // Check if Command key (metaKey) is pressed for zoom
+            if (event.metaKey || event.ctrlKey) {
+                // Zoom with Command+scroll
+                var zoomSpeed = 0.1;
+                var zoomDelta = event.deltaY > 0 ? 1 + zoomSpeed : 1 - zoomSpeed;
+
+                // Get current distance from target
+                var distance = camera.position.distanceTo(controls.target);
+                var newDistance = distance * zoomDelta;
+
+                // Limit zoom range
+                newDistance = Math.max(2, Math.min(50, newDistance));
+
+                // Apply zoom by moving camera along its direction to target
+                var direction = new THREE.Vector3().subVectors(camera.position, controls.target).normalize();
+                camera.position.copy(controls.target).add(direction.multiplyScalar(newDistance));
+                controls.update();
+            } else {
+                // Track transition from auto-rotate to scroll - capture current state
+                if (!isScrolling && model) {
+                    savedRotationAngle = model.rotation.y;
+                    cumulativeScrollY = 0;
+                    autoRotateOffset = 0;
+                }
+
+                // Regular scroll rotation when no modifier key
+                cumulativeScrollY += event.deltaY * 0.5;
+                lastScrollTime = Date.now();
+                isScrolling = true;
+            }
+        }
+        
+        window.addEventListener('wheel', onWheel, { passive: false });
+        
+        // Mouse interaction
+        function onMouseMove(event) {
+            if (!model || isAnimating) return;
+            
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            var intersects = raycaster.intersectObjects(modelChildren, false);
+            
+            var partNameElement = document.getElementById('partName');
+            var partNameText = document.getElementById('partNameText');
+            
+            // Reset previous hover
+            if (hoveredPart && (intersects.length === 0 || hoveredPart !== intersects[0].object)) {
+                hoveredPart = null;
+                partNameElement.style.opacity = '0';
+            }
+            
+            // Set new hover
+            if (intersects.length > 0) {
+                var newHover = intersects[0].object;
+                if (newHover !== hoveredPart) {
+                    hoveredPart = newHover;
+                    partNameText.textContent = hoveredPart.userData.partName || 'Unknown Part';
+                    partNameElement.style.opacity = '1';
+                }
+            } else {
+                hoveredPart = null;
+                partNameElement.style.opacity = '0';
+            }
+        }
+        
+        renderer.domElement.addEventListener('mousemove', onMouseMove);
+        
+        // Click handling for part selection and background clicking
+        function onClick(event) {
+            // Stop initial auto-rotation on first interaction
+            autoRotateInitial = false;
+
+            if (!model) return;
+            
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            var intersects = raycaster.intersectObjects(modelChildren, false);
+            
+            if (intersects.length > 0) {
+                var clickedPart = intersects[0].object;
+                var partName = clickedPart.name;
+                var accordionNumber = getAccordionNumberForPart(partName);
+                
+                if (accordionNumber) {
+                    // Check if clicking same part again - toggle behavior
+                    if (currentlyClickedPart === partName && isExploded) {
+                        // Same part clicked again - assemble
+                        currentlyClickedPart = null;
+                        currentAccordionOpen = null;
+                        // Close all accordion items
+                        document.querySelectorAll('.parts-content').forEach(function(content) {
+                            content.classList.remove('expanded');
+                        });
+                        clearHighlights();
+                        triggerAssemble();
+                    } else {
+                        // Different part or first click - explode and open accordion
+                        currentlyClickedPart = partName;
+                        currentAccordionOpen = accordionNumber;
+                        openAccordionItem(accordionNumber);
+                    }
+                }
+            } else {
+                // Clicked on background - reassemble if exploded
+                if (isExploded && !isAnimating) {
+                    currentlyClickedPart = null;
+                    currentAccordionOpen = null;
+                    // Close all accordion items
+                    document.querySelectorAll('.parts-content').forEach(function(content) {
+                        content.classList.remove('expanded');
+                    });
+                    clearHighlights();
+                    triggerAssemble();
+                }
+            }
+        }
+        
+        renderer.domElement.addEventListener('click', onClick);
+        
+        // Setup control handlers
+        function setupControls() {
+            // Add expand/collapse functionality
+            document.getElementById('controlsHeader').addEventListener('click', function() {
+                var controls = document.getElementById('controls');
+                controls.classList.toggle('expanded');
+            });
+            
+            document.getElementById('edgeThreshold').addEventListener('input', function(e) {
+                var value = parseFloat(e.target.value);
+                edgeShader.uniforms.edgeThreshold.value = value;
+                document.getElementById('edgeValue').textContent = value.toFixed(2);
+            });
+            
+            document.getElementById('lineWidth').addEventListener('input', function(e) {
+                var value = parseFloat(e.target.value);
+                edgeShader.uniforms.lineWidth.value = value;
+                document.getElementById('lineValue').textContent = value.toFixed(1);
+            });
+            
+            document.getElementById('detailIntensity').addEventListener('input', function(e) {
+                var value = parseFloat(e.target.value);
+                edgeShader.uniforms.detailIntensity.value = value;
+                document.getElementById('detailValue').textContent = value.toFixed(1);
+            });
+            
+            document.getElementById('sobelWeight').addEventListener('input', function(e) {
+                var value = parseFloat(e.target.value);
+                edgeShader.uniforms.sobelWeight.value = value;
+                document.getElementById('sobelValue').textContent = value.toFixed(1);
+            });
+            
+            var scharrElement = document.getElementById('scharrWeight');
+            if (scharrElement) {
+                scharrElement.addEventListener('input', function(e) {
+                    var value = parseFloat(e.target.value);
+                    console.log('Scharr Weight changed to:', value);
+                    if (edgeShader && edgeShader.uniforms && edgeShader.uniforms.scharrWeight) {
+                        edgeShader.uniforms.scharrWeight.value = value;
+                        document.getElementById('scharrValue').textContent = value.toFixed(1);
+                    } else {
+                        console.error('Scharr Weight uniform not found');
+                    }
+                });
+            } else {
+                console.error('scharrWeight element not found');
+            }
+            
+            var laplacianElement = document.getElementById('laplacianScale');
+            if (laplacianElement) {
+                laplacianElement.addEventListener('input', function(e) {
+                    var value = parseFloat(e.target.value);
+                    console.log('Laplacian Scale changed to:', value);
+                    if (edgeShader && edgeShader.uniforms && edgeShader.uniforms.laplacianScale) {
+                        edgeShader.uniforms.laplacianScale.value = value;
+                        document.getElementById('laplacianValue').textContent = value.toFixed(1);
+                    } else {
+                        console.error('Laplacian Scale uniform not found');
+                    }
+                });
+            } else {
+                console.error('laplacianScale element not found');
+            }
+            
+            document.getElementById('contrastBoost').addEventListener('input', function(e) {
+                var value = parseFloat(e.target.value);
+                edgeShader.uniforms.contrastBoost.value = value;
+                document.getElementById('contrastValue').textContent = value.toFixed(1);
+            });
+        }
+        
+        // Resize handler
+        window.addEventListener('resize', function() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.setViewOffset(window.innerWidth, window.innerHeight, 200, 0, window.innerWidth, window.innerHeight);
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderTarget.setSize(window.innerWidth, window.innerHeight);
+            fillRenderTarget.setSize(window.innerWidth, window.innerHeight);
+            edgeShader.uniforms.resolution.value.set(window.innerWidth, window.innerHeight);
+        });
+        
+        // Create fullscreen quad for edge detection (create once, reuse)
+        var quadGeometry = new THREE.PlaneGeometry(2, 2);
+        var quad = new THREE.Mesh(quadGeometry, edgeShader);
+        var quadScene = new THREE.Scene();
+        quadScene.add(quad);
+        var quadCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+        
+        // Animation loop
+        var clock = new THREE.Clock();
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            var delta = clock.getDelta();
+            if (mixer) mixer.update(delta);
+
+            // Update camera animation
+            if (cameraAnimating) {
+                cameraAnimationProgress += delta * 2.0; // Faster animation speed
+                if (cameraAnimationProgress >= 1.0) {
+                    cameraAnimationProgress = 1.0;
+                    cameraAnimating = false;
+                }
+
+                // Smooth easing function (ease-in-out cubic)
+                var t = cameraAnimationProgress;
+                var eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+                // Interpolate camera position and target smoothly
+                camera.position.lerpVectors(initialCameraPosition, targetCameraPosition, eased);
+                controls.target.lerpVectors(initialCameraTarget, targetCameraTarget, eased);
+                controls.update();
+            }
+
+            // Auto-assemble if exploded but no accordion items are open
+            checkAndForceAssemble();
+
+            if (model) {
+                // Check if user stopped scrolling (300ms timeout)
+                wasScrolling = isScrolling;
+                if (isScrolling && Date.now() - lastScrollTime > 300) {
+                    // Capture final rotation before stopping scroll
+                    savedRotationAngle = model.rotation.y;
+                    autoRotateOffset = 0;
+                    isScrolling = false;
+                }
+
+                // Handle rotation: simple and smooth with ALWAYS ON auto-rotation
+                if (isScrolling) {
+                    // User is scrolling - manual control from saved base
+                    var scrollRot = cumulativeScrollY * 0.005;
+                    model.rotation.y = savedRotationAngle + scrollRot;
+                } else if (autoRotateInitial) {
+                    // Initial gentle swing rotation
+                    autoRotateTime += delta * 0.3;
+                    model.rotation.y = Math.sin(autoRotateTime) * 0.3;
+                } else {
+                    // Continuous auto-rotate after first interaction (both states)
+                    autoRotateOffset += 0.002;
+                    model.rotation.y = savedRotationAngle + autoRotateOffset;
+                }
+                
+                // Three-pass rendering: edge detection geometry, fill highlights, then combine
+                
+                // Pass 1: Render scene with edge detection materials
+                modelChildren.forEach(function(child) {
+                    child.material = child.userData.edgeMaterial;
+                });
+                renderer.setRenderTarget(renderTarget);
+                renderer.render(scene, camera);
+                
+                // Pass 2: Render with background + highlighting for fill
+                modelChildren.forEach(function(child) {
+                    if (child === hoveredPart) {
+                        // Hover takes priority
+                        child.material = child.userData.hoverMaterial;
+                    } else if (highlightedParts.includes(child)) {
+                        // Accordion highlighting
+                        child.material = child.userData.hoverMaterial;
+                    } else {
+                        child.material = child.userData.backgroundMaterial;
+                    }
+                });
+                renderer.setRenderTarget(fillRenderTarget);
+                renderer.render(scene, camera);
+                
+                // Restore background materials for main scene
+                modelChildren.forEach(function(child) {
+                    child.material = child.userData.backgroundMaterial;
+                });
+                
+                // Pass 3: Combine edge detection and fill
+                edgeShader.uniforms.tDiffuse.value = renderTarget.texture;
+                edgeShader.uniforms.tFill.value = fillRenderTarget.texture;
+                
+                renderer.setRenderTarget(null);
+                renderer.render(quadScene, quadCamera);
+            } else {
+                renderer.render(scene, camera);
+            }
+            
+            controls.update();
+        }
+        
+        animate();
+        setupControls();
+    </script>
+</body>
+</html>
